@@ -27,7 +27,9 @@ const uint32_t maxSpiFileData = 2048;
 
 // Define the SPI clock frequency
 // The SAM occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.
-const uint32_t spiFrequency = 27000000;     // This will get rounded down to 80MHz/3
+//const uint32_t spiFrequency = 27000000;     // This will get rounded down to 80MHz/3
+//SD:: LPC as a slave can only up to 1/12th PCLK. 7M was getting some errors, 6M seems stable.
+const uint32_t spiFrequency = 6000000;
 
 // Pin numbers
 const int SamSSPin = 15;          // GPIO15, output to SAM, SS pin for SPI transfer

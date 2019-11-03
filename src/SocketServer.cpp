@@ -1115,7 +1115,8 @@ void setup()
     // Set up the fast SPI channel
     hspi.begin();
     hspi.setBitOrder(MSBFIRST);
-    hspi.setDataMode(SPI_MODE1);
+    //hspi.setDataMode(SPI_MODE1);
+    hspi.setDataMode(SPI_MODE3);
     hspi.setFrequency(spiFrequency);
 
     Connection::Init();
