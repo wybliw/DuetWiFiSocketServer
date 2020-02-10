@@ -8,6 +8,7 @@
 #include "ecv.h"
 #undef yield
 #undef array
+#undef out
 
 extern "C"
 {
@@ -31,7 +32,9 @@ extern "C"
 #include "Config.h"
 #include "PooledStrings.h"
 #include "HSPI.h"
-
+// There is a name clash between this code and the ESP8266 Arduino core framework. Both use WiFiState. Rename
+// ours to avoid the clash. Better ways to do this, but this requires minimal change.
+#define WiFiState SSWiFiState
 #include "include/MessageFormats.h"
 #include "Connection.h"
 #include "Listener.h"
@@ -88,7 +91,8 @@ const WirelessConfigurationData *RetrieveSsidData(const char *ssid, int *index =
 {
 	for (size_t i = 1; i <= MaxRememberedNetworks; ++i)
 	{
-		const WirelessConfigurationData *wp = EEPROM.getPtr<WirelessConfigurationData>(i * sizeof(WirelessConfigurationData));
+		const WirelessConfigurationData *wp = reinterpret_cast<const WirelessConfigurationData*>(EEPROM.getConstDataPtr()+(i * sizeof(WirelessConfigurationData)));
+
 		if (wp != nullptr && strncmp(ssid, wp->ssid, sizeof(wp->ssid)) == 0)
 		{
 			if (index != nullptr)
@@ -106,7 +110,7 @@ bool FindEmptySsidEntry(int *index)
 {
 	for (size_t i = 1; i <= MaxRememberedNetworks; ++i)
 	{
-		const WirelessConfigurationData *wp = EEPROM.getPtr<WirelessConfigurationData>(i * sizeof(WirelessConfigurationData));
+		const WirelessConfigurationData *wp = reinterpret_cast<const WirelessConfigurationData*>(EEPROM.getConstDataPtr()+(i * sizeof(WirelessConfigurationData)));
 		if (wp != nullptr && wp->ssid[0] == 0xFF)
 		{
 			*index = i;
@@ -643,7 +647,6 @@ void ICACHE_RAM_ATTR ProcessRequest()
 	else
 	{
 		const size_t dataBufferAvailable = std::min<size_t>(messageHeaderIn.hdr.dataBufferAvailable, MaxDataLength);
-
 		// See what command we have received and take appropriate action
 		switch (messageHeaderIn.hdr.command)
 		{
@@ -789,7 +792,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				char *p = reinterpret_cast<char*>(transferBuffer);
 				for (size_t i = 0; i <= MaxRememberedNetworks && (i + 1) * ReducedWirelessConfigurationDataSize <= dataBufferAvailable; ++i)
 				{
-					const WirelessConfigurationData * const tempData = EEPROM.getPtr<WirelessConfigurationData>(i * sizeof(WirelessConfigurationData));
+					const WirelessConfigurationData * const tempData = reinterpret_cast<const WirelessConfigurationData*>(EEPROM.getConstDataPtr()[i * sizeof(WirelessConfigurationData)]);
 					if (tempData->ssid[0] != 0xFF)
 					{
 						memcpy(p, tempData, ReducedWirelessConfigurationDataSize);
@@ -811,7 +814,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				char *p = reinterpret_cast<char*>(transferBuffer);
 				for (size_t i = 0; i <= MaxRememberedNetworks; ++i)
 				{
-					const WirelessConfigurationData * const tempData = EEPROM.getPtr<WirelessConfigurationData>(i * sizeof(WirelessConfigurationData));
+					const WirelessConfigurationData * const tempData = reinterpret_cast<const WirelessConfigurationData*>(EEPROM.getConstDataPtr()+(i * sizeof(WirelessConfigurationData)));
 					if (tempData->ssid[0] != 0xFF)
 					{
 						for (size_t j = 0; j < SsidLength && tempData->ssid[j] != 0; ++j)
@@ -1104,7 +1107,6 @@ void setup()
 	const size_t eepromSizeNeeded = (MaxRememberedNetworks + 1) * sizeof(WirelessConfigurationData);
 	static_assert(eepromSizeNeeded <= SPI_FLASH_SEC_SIZE, "Insufficient EEPROM");
 	EEPROM.begin(eepromSizeNeeded);
-
 	// Set up the SPI subsystem
     pinMode(SamTfrReadyPin, INPUT);
     pinMode(EspReqTransferPin, OUTPUT);
