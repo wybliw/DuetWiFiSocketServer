@@ -792,7 +792,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				char *p = reinterpret_cast<char*>(transferBuffer);
 				for (size_t i = 0; i <= MaxRememberedNetworks && (i + 1) * ReducedWirelessConfigurationDataSize <= dataBufferAvailable; ++i)
 				{
-					const WirelessConfigurationData * const tempData = reinterpret_cast<const WirelessConfigurationData*>(EEPROM.getConstDataPtr()[i * sizeof(WirelessConfigurationData)]);
+					const WirelessConfigurationData * const tempData = reinterpret_cast<const WirelessConfigurationData*>(EEPROM.getConstDataPtr()+(i * sizeof(WirelessConfigurationData)));
 					if (tempData->ssid[0] != 0xFF)
 					{
 						memcpy(p, tempData, ReducedWirelessConfigurationDataSize);
