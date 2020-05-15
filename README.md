@@ -1,12 +1,27 @@
-The following variuables muse be set at the workspace level before
-building:
-To set them, go to
- Windows -> Preferences -> C/C++ -> Build -> Build Variables
-and click "Add..."
+Fork of the Duet WiFi Socket Server for LPC/RRF and updated ESP SDK/Framework
+===========================================
 
-XtensaGccPath: The path to your xtensa toolchain bin directory.  For example...
-	<sourcedir>/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/bin
-EspBootFile: The esp8266 boot file.  For example...
-	<sourcedir>/esp8266/hardware/esp8266/2.4.1/bootloaders/eboot/eboot.elf
-EspToolPath: The path to esptool.  For example...
-	<sourcedir>/esp8266/tools/esptool/0.4.13/esptool.exe
+# Duet WiFi Socket Server for LPC1768 versions of RRF
+This fork of the Duet WiFi Socket Server is intended for use with the LPC1768 version of RRF.
+It supports a smaller number of active connections than the standard server (to match the LPC
+RRF port). It is also built using a more recent ESP8266 toolkit and framework.
+ 
+# Build Instructions
+
+Checout and build the ESP8266 framework from here:
+    https://github.com/gloomyandy/Arduino.git
+
+Checkout the this branch on your computer
+
+    git clone https://github.com/gloomyandy/DuetWiFiSocketServer.git
+    cd DuetWiFiSocketServer
+    git checkout newsdk-lpc
+
+Build the firmware
+
+    make
+
+Upload to an ESP8266 connect via USB (replace <Com Port> by the actual port)
+    esptools.py --port <COM Port> write_flash 0x00000 duetwifi.bin
+
+
