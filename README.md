@@ -8,7 +8,7 @@ RRF port). It is also built using a more recent ESP8266 toolkit and framework.
  
 # Build Instructions
 
-Checout and build the ESP8266 framework from here:
+Checkout and build the ESP8266 framework from here:
     https://github.com/gloomyandy/Arduino.git
 
 Checkout the this branch on your computer
@@ -22,6 +22,7 @@ Build the firmware
     make
 
 Upload to an ESP8266 connect via USB (replace <Com Port> by the actual port)
+
     esptools.py --port <COM Port> write_flash 0x00000 duetwifi.bin
 
 
