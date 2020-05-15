@@ -21,7 +21,7 @@ Build the firmware
 
     make
 
-Upload to an ESP8266 connect via USB (replace <Com Port> by the actual port)
+Upload to an ESP8266 connect via USB (replace \<Com Port\> by the actual port)
 
     esptools.py --port <COM Port> write_flash 0x00000 duetwifi.bin
 
