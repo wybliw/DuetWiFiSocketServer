@@ -5,7 +5,13 @@
 
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.23L263-302"
+#define VERSION_MAIN	"1.23-01"
+
+#ifdef LPCRRF
+#define VERSION_HOSTSYS "L"
+#else
+#define VERSION_HOSTSYS "D"
+#endif
 
 #if NO_WIFI_SLEEP
 #define VERSION_SLEEP	"-nosleep"
@@ -19,17 +25,22 @@
 #define VERSION_DEBUG	""
 #endif
 
-const char* const firmwareVersion = VERSION_MAIN VERSION_DEBUG VERSION_SLEEP;
+const char* const firmwareVersion = VERSION_MAIN VERSION_HOSTSYS VERSION_DEBUG VERSION_SLEEP;
 
 // Define the maximum length (bytes) of file upload data per SPI packet. Use a multiple of the SD card sector or cluster size for efficiency.
 // ************ This must be kept in step with the corresponding value in RepRapFirmware *************
 const uint32_t maxSpiFileData = 2048;
 
 // Define the SPI clock frequency
-// The SAM occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.
-//const uint32_t spiFrequency = 27000000;     // This will get rounded down to 80MHz/3
+#ifdef LPCRRF
 //SD:: LPC as a slave can only up to 1/12th PCLK. 7M was getting some errors, 6M seems stable.
 const uint32_t spiFrequency = 6000000;
+#define SS_SPI_MODE SPI_MODE1
+#else
+// The SAM occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.
+const uint32_t spiFrequency = 27000000;     // This will get rounded down to 80MHz/3
+#define SS_SPI_MODE SPI_MODE1
+#endif
 
 // Pin numbers
 const int SamSSPin = 15;          // GPIO15, output to SAM, SS pin for SPI transfer
