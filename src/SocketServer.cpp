@@ -63,7 +63,8 @@ const int DefaultWiFiChannel = 6;
 // Global data
 char currentSsid[SsidLength + 1];
 char webHostName[HostNameLength + 1] = "Duet-WiFi";
-
+uint8_t currentBssid[6];
+uint8_t *currentBssidPtr;
 DNSServer dns;
 
 static const char* lastError = nullptr;
@@ -144,11 +145,17 @@ void FactoryReset()
 }
 
 // Try to connect using the specified SSID and password
-void ConnectToAccessPoint(const WirelessConfigurationData& apData, bool isRetry)
+void ConnectToAccessPoint(const WirelessConfigurationData& apData, uint8_t *bssid, bool isRetry)
 pre(currentState == NetworkState::idle)
 {
 	SafeStrncpy(currentSsid, apData.ssid, ARRAY_SIZE(currentSsid));
-
+	if (bssid != nullptr)
+	{
+		memcpy(currentBssid, bssid, ARRAY_SIZE(currentBssid));
+		currentBssidPtr = currentBssid;
+	}
+	else
+		currentBssidPtr = nullptr;
 	WiFi.mode(WIFI_STA);
 	wifi_station_set_hostname(webHostName);     				// must do this before calling WiFi.begin()
 	WiFi.setAutoConnect(false);
@@ -160,7 +167,7 @@ pre(currentState == NetworkState::idle)
 #endif
 	WiFi.config(IPAddress(apData.ip), IPAddress(apData.gateway), IPAddress(apData.netmask), IPAddress(), IPAddress());
 	debugPrintf("Trying to connect to ssid \"%s\" with password \"%s\"\n", apData.ssid, apData.password);
-	WiFi.begin(apData.ssid, apData.password);
+	WiFi.begin(apData.ssid, apData.password, 0, currentBssidPtr);
 
 	if (isRetry)
 	{
@@ -243,7 +250,7 @@ void ConnectPoll()
 			SafeStrncat(lastConnectError, currentSsid, ARRAY_SIZE(lastConnectError));
 			lastError = lastConnectError;
 			connectErrorChanged = true;
-			debugPrint("Failed to connect to AP\n");
+			debugPrintf("Failed to connect to AP error '%s'\n", lastConnectError);
 
 			if (!retry)
 			{
@@ -299,7 +306,7 @@ void ConnectPoll()
 			SafeStrncat(lastConnectError, error, ARRAY_SIZE(lastConnectError));
 			lastError = lastConnectError;
 			connectErrorChanged = true;
-			debugPrint("Lost connection to AP\n");
+			debugPrintf("Lost connection to AP status '%s'\n", lastConnectError);
 			break;
 		}
 		break;
@@ -321,6 +328,7 @@ void ConnectPoll()
 			lastError = "Timed out trying to auto-reconnect";
 			retry = true;
 		}
+		debugPrintf("Autoreconnect to AP status '%s'\n", lastError);
 		break;
 
 	default:
@@ -329,50 +337,19 @@ void ConnectPoll()
 
 	if (retry)
 	{
-		ConnectToAccessPoint(*ssidData, true);
+		ConnectToAccessPoint(*ssidData, currentBssidPtr, true);
 	}
 }
 
 void StartClient(const char * array ssid)
 pre(currentState == WiFiState::idle)
 {
+	uint8_t *ssidPtr = (ssid != nullptr && ssid[0] != 0 ? (uint8_t *)ssid : nullptr);
 	ssidData = nullptr;
 
-	if (ssid == nullptr || ssid[0] == 0)
+	if (ssidPtr != nullptr)
 	{
-		// Auto scan for strongest known network, then try to connect to it
-		const int8_t num_ssids = WiFi.scanNetworks(false, true);
-		if (num_ssids < 0)
-		{
-			lastError = "network scan failed";
-			currentState = WiFiState::idle;
-			digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
-			return;
-		}
-
-		// Find the strongest network that we know about
-		int8_t strongestNetwork = -1;
-		for (int8_t i = 0; i < num_ssids; ++i)
-		{
-			debugPrintfAlways("found network %s\n", WiFi.SSID(i).c_str());
-			if (strongestNetwork < 0 || WiFi.RSSI(i) > WiFi.RSSI(strongestNetwork))
-			{
-				const WirelessConfigurationData *wp = RetrieveSsidData(WiFi.SSID(i).c_str(), nullptr);
-				if (wp != nullptr)
-				{
-					strongestNetwork = i;
-					ssidData = wp;
-				}
-			}
-		}
-		if (strongestNetwork < 0)
-		{
-			lastError = "no known networks found";
-			return;
-		}
-	}
-	else
-	{
+		// we have a target ssid
 		ssidData = RetrieveSsidData(ssid, nullptr);
 		if (ssidData == nullptr)
 		{
@@ -380,9 +357,49 @@ pre(currentState == WiFiState::idle)
 			return;
 		}
 	}
+	// Auto scan for strongest known network, then try to connect to it
+	const int8_t num_ssids = WiFi.scanNetworks(false, true, 0, ssidPtr, 500, 750);
+	debugPrintf("Scan found %d SSIDs\n", num_ssids);
+	if (num_ssids < 0)
+	{
+		lastError = "network scan failed";
+		currentState = WiFiState::idle;
+		digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+		return;
+	}
 
-	// ssidData contains the details of the strongest known access point
-	ConnectToAccessPoint(*ssidData, false);
+	// Find the strongest network that we know about
+	int8_t strongestNetwork = -1;
+	for (int8_t i = 0; i < num_ssids; ++i)
+	{
+		debugPrintfAlways("found network %s BSSID %s RSSI %d\n", WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.RSSI(i));
+		if (strongestNetwork < 0 || WiFi.RSSI(i) > WiFi.RSSI(strongestNetwork))
+		{
+			const WirelessConfigurationData *wp = RetrieveSsidData(WiFi.SSID(i).c_str(), nullptr);
+			if (wp != nullptr)
+			{
+				strongestNetwork = i;
+				ssidData = wp;
+			}
+		}
+	}
+	if (ssidData == nullptr)
+	{
+		lastError = "no known networks found";
+		debugPrint("No network found\n");
+		return;
+	}
+	if (strongestNetwork >= 0)
+	{
+		debugPrintf("Selected AP SSID \"%s\", BSSID %s RSSI %d\n", WiFi.SSID(strongestNetwork).c_str(), WiFi.BSSIDstr(strongestNetwork).c_str(), WiFi.RSSI(strongestNetwork));
+		// ssidData contains the details of the strongest known access point
+		ConnectToAccessPoint(*ssidData, WiFi.BSSID(strongestNetwork), false);
+	}
+	else
+	{
+		debugPrint("Search did not find requested AP, trying to connect anyway\n");
+		ConnectToAccessPoint(*ssidData, nullptr, false);
+	}
 }
 
 bool CheckValidSSID(const char * array s)
@@ -711,10 +728,14 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				response->sleepMode = (uint8_t)wifi_get_sleep_type() + 1;
 				response->spare = 0;
 				response->vcc = system_get_vdd33();
-			    wifi_get_macaddr((runningAsAp) ? SOFTAP_IF : STATION_IF, response->macAddress);
-			    SafeStrncpy(response->versionText, firmwareVersion, sizeof(response->versionText));
-			    SafeStrncpy(response->hostName, webHostName, sizeof(response->hostName));
-			    SafeStrncpy(response->ssid, currentSsid, sizeof(response->ssid));
+				// if connected return BSSID of AP to help identification
+				if (runningAsStation)
+					memcpy(response->macAddress, WiFi.BSSID(), 6);
+				else
+					wifi_get_macaddr((runningAsAp) ? SOFTAP_IF : STATION_IF, response->macAddress);
+				SafeStrncpy(response->versionText, firmwareVersion, sizeof(response->versionText));
+				SafeStrncpy(response->hostName, webHostName, sizeof(response->hostName));
+				SafeStrncpy(response->ssid, currentSsid, sizeof(response->ssid));
 				SendResponse(sizeof(NetworkStatusResponse));
 			}
 			break;
@@ -1117,8 +1138,7 @@ void setup()
     // Set up the fast SPI channel
     hspi.begin();
     hspi.setBitOrder(MSBFIRST);
-    //hspi.setDataMode(SPI_MODE1);
-    hspi.setDataMode(SPI_MODE3);
+    hspi.setDataMode(SS_SPI_MODE);
     hspi.setFrequency(spiFrequency);
 
     Connection::Init();
