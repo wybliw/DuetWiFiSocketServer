@@ -5,7 +5,7 @@
 
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.23-01"
+#define VERSION_MAIN	"1.23-02"
 
 #ifdef LPCRRF
 #define VERSION_HOSTSYS "L"
