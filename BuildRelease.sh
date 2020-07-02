@@ -9,7 +9,7 @@ mkdir -p releases/${VER}
 
 #Building LPC Firmware
 make BUILD=relbuild clean
-make -j2 BUILD=relbuild HOSTSSYS=LPCRRF
+make -j2 BUILD=relbuild HOSTSYS=-DLPCRRF
 if [ -f ./relbuild/DuetWiFiServer.bin ]; then
 	mv ./relbuild/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer.bin
 fi 
