@@ -19,7 +19,7 @@ const size_t SsidLength = 32;
 const size_t PasswordLength = 64;
 const size_t HostNameLength = 64;
 const size_t MaxDataLength = 2048;						// maximum length of the data part of an SPI exchange
-#ifdef LPCRRF
+#if defined(LPCRRF) || defined(__LPC17xx__)
 const size_t MaxConnections = 2;						// the number of simultaneous connections we support
 #else
 const size_t MaxConnections = 8;						// the number of simultaneous connections we support
