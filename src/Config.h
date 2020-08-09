@@ -9,6 +9,8 @@
 
 #ifdef LPCRRF
 #define VERSION_HOSTSYS "L"
+#elif defined(STM32F4)
+#define VERSION_HOSTSYS "S"
 #else
 #define VERSION_HOSTSYS "D"
 #endif
@@ -35,6 +37,9 @@ const uint32_t maxSpiFileData = 2048;
 #ifdef LPCRRF
 //SD:: LPC as a slave can only up to 1/12th PCLK. 7M was getting some errors, 6M seems stable.
 const uint32_t spiFrequency = 6000000;
+#define SS_SPI_MODE SPI_MODE1
+#elif defined(STM32F4)
+const uint32_t spiFrequency = 16000000;
 #define SS_SPI_MODE SPI_MODE1
 #else
 // The SAM occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.

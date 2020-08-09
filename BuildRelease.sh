@@ -14,6 +14,12 @@ if [ -f ./relbuild/DuetWiFiServer.bin ]; then
 	mv ./relbuild/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer.bin
 fi 
 
+#Building STM32F4 Firmware
+make BUILD=relbuild clean
+make -j2 BUILD=relbuild HOSTSYS=-DSTM32F4
+if [ -f ./relbuild/DuetWiFiServer.bin ]; then
+	mv ./relbuild/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-stm32f4.bin
+fi 
 
 #Building Duet firmware
 make BUILD=relbuild clean
