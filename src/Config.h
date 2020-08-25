@@ -5,7 +5,7 @@
 
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.23-02"
+#define VERSION_MAIN	"1.24-01"
 
 #ifdef LPCRRF
 #define VERSION_HOSTSYS "L"
@@ -46,6 +46,27 @@ const uint32_t spiFrequency = 16000000;
 const uint32_t spiFrequency = 27000000;     // This will get rounded down to 80MHz/3
 #define SS_SPI_MODE SPI_MODE1
 #endif
+// Define the SPI clock register
+// Useful values of the register are:
+// 0x1001	40MHz 1:1
+// 0x2001	26.7MHz 1:2
+// 0x2402	26.7MHz 1:2
+// 0x2002	26.7MHz 2:1
+// 0x3043	20MHz 2:2
+
+// Define the SPI clock frequency
+#ifdef LPCRRF
+//SD:: LPC as a slave can only up to 1/12th PCLK. 7M was getting some errors, 6M seems stable.
+const uint32_t defaultClockControl = 0xd000 | (0x6 << 6) | (0xd); // 5.71MHz 7:7
+#elif defined(STM32F4)
+//const uint32_t defaultClockControl = 0x3043;	// 20MHz 2:2;
+const uint32_t defaultClockControl = 0x4000 | (2 << 6) | (4);	// 16MHz 3:2 - maybe!
+#else
+// The SAM occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.
+// Due to the 15ns SCLK to MISO delay of the SAMD51, 2:1 is preferred over 1:2
+const uint32_t defaultClockControl = 0x2002;		// 80MHz/3, mark:space 2:1
+#endif
+
 
 // Pin numbers
 const int SamSSPin = 15;          // GPIO15, output to SAM, SS pin for SPI transfer
