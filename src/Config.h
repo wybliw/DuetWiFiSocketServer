@@ -57,7 +57,8 @@ const uint32_t spiFrequency = 27000000;     // This will get rounded down to 80M
 // Define the SPI clock frequency
 #ifdef LPCRRF
 //SD:: LPC as a slave can only up to 1/12th PCLK. 7M was getting some errors, 6M seems stable.
-const uint32_t defaultClockControl = 0xd000 | (0x6 << 6) | (0xd); // 5.71MHz 7:7
+//const uint32_t defaultClockControl = 0xd000 | (0x6 << 6) | (0xd); // 5.71MHz 7:7
+const uint32_t defaultClockControl = 0x181001; // 5.71MHz 1:1
 #elif defined(STM32F4)
 //const uint32_t defaultClockControl = 0x3043;	// 20MHz 2:2;
 const uint32_t defaultClockControl = 0x4000 | (2 << 6) | (4);	// 16MHz 3:2 - maybe!

@@ -1210,11 +1210,14 @@ void loop()
 		connectErrorChanged = false;
 		lastStatusReportTime = millis();
 	}
-
 	// See whether there is a request from the SAM.
+#if defined(LPCRRF)
+	if (digitalRead(SamTfrReadyPin) == HIGH)
+#else
 	// Duet WiFi 1.04 and earlier have hardware to ensure that TransferReady goes low when a transaction starts.
 	// Duet 3 Mini doesn't, so we need to see TransferReady go low and then high again. In case that happens so fast that we dn't get the interrupt, we have a timeout.
 	if (digitalRead(SamTfrReadyPin) == HIGH && (transferReadyChanged || millis() - whenLastTransactionFinished > TransferReadyTimeout))
+#endif
 	{
 		transferReadyChanged = false;
 		ProcessRequest();
