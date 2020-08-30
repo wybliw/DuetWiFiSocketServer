@@ -116,6 +116,7 @@ SECTIONS
     *(.text.gdbstub*, .text.gdb_init) /* Any GDB hooks */
     /* all functional callers are placed in IRAM (including SPI/IRQ callbacks/etc) here */
     *(.text._ZNKSt8functionIF*EE*) /* std::function<any(...)>::operator()() const */
+    *(.text._Z16TransferReadyIsrv)
   } >iram1_0_seg :iram1_0_phdr
   .irom0.text : ALIGN(4)
   {

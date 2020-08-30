@@ -87,7 +87,7 @@ DuetWiFiSocketServer.elf: $(OBJ) src/ld/local.eagle.app.v6.common.ld
 
 
 DuetWiFiServer.bin: DuetWiFiSocketServer.elf
-	python3 $(SDKTOOLS)/elf2bin.py -e $(SDKBASE)/bootloaders/eboot/eboot.elf -a $(BUILD)/DuetWiFiSocketServer.elf -o $(BUILD)/DuetWiFiServer.bin -m dio -f 40 -s 4M -p $(SDKTOOLS)/xtensa-lx106-elf/bin/
+	python $(SDKTOOLS)/elf2bin.py -e $(SDKBASE)/bootloaders/eboot/eboot.elf -a $(BUILD)/DuetWiFiSocketServer.elf -o $(BUILD)/DuetWiFiServer.bin -m dio -f 40 -s 4M -p $(SDKTOOLS)/xtensa-lx106-elf/bin/
 
 clean:
 	rm -rf $(BUILD)
