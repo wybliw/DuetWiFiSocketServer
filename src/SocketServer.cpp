@@ -1211,7 +1211,7 @@ void loop()
 		lastStatusReportTime = millis();
 	}
 	// See whether there is a request from the SAM.
-#if defined(LPCRRF)
+#if defined(LPCRRF) || defined(STM32F4)
 	if (digitalRead(SamTfrReadyPin) == HIGH)
 #else
 	// Duet WiFi 1.04 and earlier have hardware to ensure that TransferReady goes low when a transaction starts.
