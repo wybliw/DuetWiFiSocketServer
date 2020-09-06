@@ -43,7 +43,7 @@ extern "C"
 const unsigned int ONBOARD_LED = D4;				// GPIO 2
 const bool ONBOARD_LED_ON = false;					// active low
 const uint32_t ONBOARD_LED_BLINK_INTERVAL = 500;	// ms
-const uint32_t TransferReadyTimeout = 10;			// how many milliseconds we allow for the Duet to set TransferReady low after the end of a transaction, before we assume that we missed seeing it
+const uint32_t TransferReadyTimeout = 5;			// how many milliseconds we allow for the Duet to set TransferReady low after the end of a transaction, before we assume that we missed seeing it
 
 #if LWIP_VERSION_MAJOR == 2
 const char * const MdnsProtocolNames[3] = { "HTTP", "FTP", "Telnet" };
@@ -653,7 +653,6 @@ void ICACHE_RAM_ATTR ProcessRequest()
 	// Begin the transaction
 	digitalWrite(SamSSPin, LOW);            // assert CS to SAM
 	hspi.beginTransaction();
-
 	// Exchange headers, except for the last dword which will contain our response
 	hspi.transferDwords(messageHeaderOut.asDwords, messageHeaderIn.asDwords, headerDwords - 1);
 
@@ -1211,13 +1210,9 @@ void loop()
 		lastStatusReportTime = millis();
 	}
 	// See whether there is a request from the SAM.
-#if defined(LPCRRF) || defined(STM32F4)
-	if (digitalRead(SamTfrReadyPin) == HIGH)
-#else
 	// Duet WiFi 1.04 and earlier have hardware to ensure that TransferReady goes low when a transaction starts.
 	// Duet 3 Mini doesn't, so we need to see TransferReady go low and then high again. In case that happens so fast that we dn't get the interrupt, we have a timeout.
 	if (digitalRead(SamTfrReadyPin) == HIGH && (transferReadyChanged || millis() - whenLastTransactionFinished > TransferReadyTimeout))
-#endif
 	{
 		transferReadyChanged = false;
 		ProcessRequest();
