@@ -11,7 +11,14 @@ mkdir -p releases/${VER}
 make BUILD=relbuild clean
 make -j2 BUILD=relbuild HOSTSYS=-DLPCRRF
 if [ -f ./relbuild/DuetWiFiServer.bin ]; then
-	mv ./relbuild/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer.bin
+	mv ./relbuild/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-lpc.bin
+fi 
+
+#Building LPC Firmware with extended listen
+make BUILD=relbuild clean
+make -j2 BUILD=relbuild HOSTSYS="-DLPCRRF -DEXTENDED_LISTEN"
+if [ -f ./relbuild/DuetWiFiServer.bin ]; then
+	mv ./relbuild/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-lpc-el.bin
 fi 
 
 #Building STM32F4 Firmware

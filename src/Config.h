@@ -5,10 +5,14 @@
 
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.24-01"
+#define VERSION_MAIN	"1.24-02"
 
 #ifdef LPCRRF
+#ifdef EXTENDED_LISTEN
+#define VERSION_HOSTSYS "LE"
+#else
 #define VERSION_HOSTSYS "L"
+#endif
 #elif defined(STM32F4)
 #define VERSION_HOSTSYS "S"
 #else

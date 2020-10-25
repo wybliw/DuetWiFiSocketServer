@@ -47,8 +47,13 @@ extern "C"
 }
 
 // Public interface
-Connection::Connection(uint8_t num)
-	: number(num), state(ConnState::free), localPort(0), remotePort(0), remoteIp(0), writeTimer(0), closeTimer(0),
+Connection::Connection(uint8_t num) :
+#ifdef EXTENDED_LISTEN
+ number(0xff),
+#else
+ number(num),
+#endif
+ state(ConnState::free), localPort(0), remotePort(0), remoteIp(0), writeTimer(0), closeTimer(0),
 	  unAcked(0), readIndex(0), alreadyRead(0), ownPcb(nullptr), pb(nullptr)
 {
 }
@@ -121,6 +126,13 @@ void Connection::Terminate(bool external)
 // Perform housekeeping tasks
 void Connection::Poll()
 {
+#ifdef EXTENDED_LISTEN
+	if (state == ConnState::free)
+		return;
+	// Are we waiting to be made public?
+	if (number == 0xff)
+		MakePublic();
+#endif
 	if (state == ConnState::connected)
 	{
 		// Are we still waiting for data to be written?
@@ -278,6 +290,25 @@ void Connection::Report()
 	}
 }
 
+#ifdef EXTENDED_LISTEN
+void Connection::MakePublic()
+{
+	// make this connection public if we can
+	for(uint32_t i = 0; i < MaxPublicConnections; i++)
+	{
+		// If one of our public connections is not in use, use that slot
+		if (publicConnections[i]->state == ConnState::free)
+		{
+			// Found a public socket that is not in use
+			publicConnections[i]->number = 0xff;
+			number = i;
+			publicConnections[i] = this;
+			return;
+		}
+	}
+}
+#endif
+
 // Callback functions
 int Connection::Accept(tcp_pcb *pcb)
 {
@@ -292,7 +323,6 @@ int Connection::Accept(tcp_pcb *pcb)
 	remoteIp = pcb->remote_ip.addr;
 	writeTimer = closeTimer = 0;
 	unAcked = readIndex = alreadyRead = 0;
-
 	return ERR_OK;
 }
 
@@ -380,6 +410,13 @@ void Connection::FreePbuf()
 	{
 		connectionList[i] = new Connection((uint8_t)i);
 	}
+#ifdef EXTENDED_LISTEN
+	for(size_t i = 0; i < MaxPublicConnections; i++)
+	{
+		publicConnections[i] = connectionList[i];
+		publicConnections[i]->number = (uint8_t)i;
+	}
+#endif
 }
 
 /*static*/ uint16_t Connection::CountConnectionsOnPort(uint16_t port)
@@ -401,7 +438,7 @@ void Connection::FreePbuf()
 
 /*static*/ void Connection::PollOne()
 {
-	Connection::Get(nextConnectionToPoll).Poll();
+	connectionList[nextConnectionToPoll]->Poll();
 	++nextConnectionToPoll;
 	if (nextConnectionToPoll == MaxConnections)
 	{
@@ -413,7 +450,7 @@ void Connection::FreePbuf()
 {
 	for (size_t i = 0; i < MaxConnections; ++i)
 	{
-		Connection::Get(i).Terminate(true);
+		connectionList[i]->Terminate(true);
 	}
 }
 
@@ -421,7 +458,11 @@ void Connection::FreePbuf()
 {
 	connectedSockets = 0;
 	otherEndClosedSockets = 0;
+#ifdef EXTENDED_LISTEN
+	for (size_t i = 0; i < MaxPublicConnections; ++i)
+#else
 	for (size_t i = 0; i < MaxConnections; ++i)
+#endif
 	{
 		if (Connection::Get(i).GetState() == ConnState::connected)
 		{
@@ -447,6 +488,9 @@ void Connection::FreePbuf()
 
 // Static data
 Connection *Connection::connectionList[MaxConnections] = { 0 };
+#ifdef EXTENDED_LISTEN
+Connection *Connection::publicConnections[MaxPublicConnections] = { 0 };
+#endif
 size_t Connection::nextConnectionToPoll = 0;
 
 // End

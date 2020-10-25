@@ -20,11 +20,21 @@ const size_t PasswordLength = 64;
 const size_t HostNameLength = 64;
 const size_t MaxDataLength = 2048;						// maximum length of the data part of an SPI exchange
 #if defined(LPCRRF) || defined(__LPC17xx__)
+#if defined(EXTENDED_LISTEN)
+const size_t MaxConnections = 8;						// the number of simultaneous connections we support
+const size_t MaxPublicConnections = 2;					// the number of simultaneous connections we make availble to RRF
+#else
 const size_t MaxConnections = 2;						// the number of simultaneous connections we support
+#endif
 #else
 const size_t MaxConnections = 8;						// the number of simultaneous connections we support
 #endif
+
+#if defined(EXTENDED_LISTEN)
+const unsigned int NumWiFiTcpSockets = MaxPublicConnections;	// the number of concurrent TCP/IP connections supported
+#else
 const unsigned int NumWiFiTcpSockets = MaxConnections;	// the number of concurrent TCP/IP connections supported
+#endif
 
 static_assert(MaxDataLength % sizeof(uint32_t) == 0, "MaxDataLength must be a whole number of dwords");
 

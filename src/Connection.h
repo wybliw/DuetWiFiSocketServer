@@ -44,7 +44,11 @@ public:
 	// Static functions
 	static void Init();
 	static Connection *Allocate();
+	#ifdef EXTENDED_LISTEN
+	static Connection& Get(uint8_t num) { return *publicConnections[num]; }
+	#else
 	static Connection& Get(uint8_t num) { return *connectionList[num]; }
+	#endif
 	static uint16_t CountConnectionsOnPort(uint16_t port);
 	static void PollOne();
 	static void ReportConnections();
@@ -54,6 +58,7 @@ public:
 private:
 	void FreePbuf();
 	void Report();
+	void MakePublic();
 
 	void SetState(ConnState st)
 	{
@@ -76,6 +81,9 @@ private:
 	pbuf *pb;					// the buffers holding data we have received that has not yet been taken
 
 	static Connection *connectionList[MaxConnections];
+#ifdef EXTENDED_LISTEN
+	static Connection *publicConnections[MaxPublicConnections];
+#endif
 	static size_t nextConnectionToPoll;
 };
 

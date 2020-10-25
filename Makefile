@@ -8,7 +8,7 @@ NONO_SDK ?=V3
 DEBUG ?=-DDEBUG
 
 # Build for Duet or LPC
-HOSTSYS ?=-DLPCRRF
+HOSTSYS ?=-DLPCRRF -DEXTENDED_LISTEN
 
 OBJ = \
         $(patsubst %.cpp,$(BUILD)/%.o,$(wildcard src/*.cpp)) \

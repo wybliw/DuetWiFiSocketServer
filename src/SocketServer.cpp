@@ -127,7 +127,11 @@ bool FindEmptySsidEntry(int *index)
 // Check socket number in range, returning true if yes. Otherwise, set lastError and return false;
 bool ValidSocketNumber(uint8_t num)
 {
+#ifdef EXTENDED_LISTEN
+	if (num < MaxPublicConnections)
+#else
 	if (num < MaxConnections)
+#endif
 	{
 		return true;
 	}
