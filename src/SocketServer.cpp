@@ -191,7 +191,7 @@ pre(currentState == NetworkState::idle)
 void ConnectPoll()
 {
 	// The Arduino WiFi.status() call is fairly useless here because it discards too much information, so use the SDK API call instead
-	const station_status_t status = wifi_station_get_connect_status();
+	const uint8_t status = wifi_station_get_connect_status();
 	const char *error = nullptr;
 	bool retry = false;
 
@@ -733,7 +733,9 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				response->rssi = (runningAsStation) ? wifi_station_get_rssi() : 0;
 				response->numClients = (runningAsAp) ? wifi_softap_get_station_num() : 0;
 				response->sleepMode = (uint8_t)wifi_get_sleep_type() + 1;
-				response->spare = 0;
+				response->phyMode = (uint8_t)wifi_get_phy_mode();
+				response->zero1 = 0;
+				response->zero2 = 0;
 				response->vcc = system_get_vdd33();
 				// if connected return BSSID of AP to help identification
 				if (runningAsStation)
@@ -1135,7 +1137,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 	}
 }
 
-void TransferReadyIsr()
+void ICACHE_RAM_ATTR TransferReadyIsr()
 {
 	transferReadyChanged = true;
 }
