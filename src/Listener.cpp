@@ -22,6 +22,7 @@ extern "C"
 		LWIP_UNUSED_ARG(err);
 		if (arg != nullptr)
 		{
+			debugPrint("conn_accept called\n");
 			return ((Listener*)arg)->Accept(pcb);
 		}
 		tcp_abort(pcb);
@@ -41,6 +42,7 @@ Listener::Listener()
 
 int Listener::Accept(tcp_pcb *pcb)
 {
+	debugPrint("Accept called\n");
 	if (listeningPcb != nullptr)
 	{
 		// Allocate a free socket for this connection
@@ -52,6 +54,7 @@ int Listener::Accept(tcp_pcb *pcb)
 			{
 				tcp_accepted(listeningPcb);		// tell the listening PCB we have accepted the connection
 				const int rslt = conn->Accept(pcb);
+				debugPrintf("Accept result is %d", rslt);
 				if (protocol == protocolFtpData)
 				{
 					debugPrintf("accept conn, stop listen on port %u\n", port);
@@ -137,7 +140,8 @@ void Listener::Stop()
 	}
 
 	ip_addr_t tempIp;
-	tempIp.addr = ip;
+	tempIp.u_addr.ip4.addr = ip;
+	tempIp.type = IPADDR_TYPE_V4;
 	tempPcb->so_options |= SOF_REUSEADDR;			// not sure we need this, but the Arduino HTTP server does it
 	err_t rc = tcp_bind(tempPcb, &tempIp, port);
 	if (rc != ERR_OK)
