@@ -45,6 +45,7 @@ extern "C"
 #include "mdns.h"
 #include "NetBIOS.h"
 //const unsigned int ONBOARD_LED = LED_BUILTIN;				// GPIO 2
+#define STATS 1
 #else
 const unsigned int ONBOARD_LED = D4;				// GPIO 2
 #endif
@@ -97,6 +98,66 @@ static uint32_t lastStatusReportTime;
 static uint32_t transferBuffer[NumDwords(MaxDataLength + 1)];
 
 static const WirelessConfigurationData *ssidData = nullptr;
+
+#if STATS
+static uint32_t requestCounts[(int)NetworkCommand::networkSetClockControl+1];
+static const char *requestNames[] = {	"nullCommand",
+										"connAbort",
+										"connClose",
+										"connCreate",
+										"connRead",
+										"connWrite",
+										"connGetStatus",
+										"networkListen",
+										"unused_networkStopListening",
+										"networkGetStatus",
+										"networkAddSsid",
+										"networkDeleteSsid",
+										"networkListSsids_deprecated",
+										"networkConfigureAccessPoint",
+										"networkStartClient",
+										"networkStartAccessPoint",
+										"networkStop",
+										"networkFactoryReset",
+										"networkSetHostName",
+										"networkGetLastError",
+										"diagnostics",
+										"networkRetrieveSsidData",
+										"networkSetTxPower",
+										"networkSetClockControl"
+									};
+static uint32_t statsStart;
+static uint32_t dataIn;
+static uint32_t dataOut;
+uint32_t readNoData;
+static uint32_t statNoData;
+static uint32_t loopCnt;
+
+static void StatsClear()
+{
+	for(int i = 0; i < ARRAY_SIZE(requestCounts); i++)
+		requestCounts[i] = 0;
+	statsStart = millis();
+	dataIn = 0;
+	dataOut = 0;
+	readNoData = 0;
+	statNoData = 0;
+	loopCnt = 0;
+}
+
+static void StatsDisplay()
+{
+	debugPrintf("Stats for %d loops %d seconds\n", loopCnt, (millis() - statsStart)/1000);
+	for (int i = 0; i < ARRAY_SIZE(requestCounts); i++)
+	{
+		debugPrintf("%s %d\n", requestNames[i], requestCounts[i]);
+	}
+	debugPrintf("Data in/out %d/%d, no data read/stat %d/%d\n", dataIn, dataOut, readNoData, statNoData);
+	StatsClear();
+}
+#endif
+	
+
 
 // Look up a SSID in our remembered network list, return pointer to it if found
 const WirelessConfigurationData *RetrieveSsidData(const char *ssid, int *index = nullptr)
@@ -423,8 +484,8 @@ void ConnectPoll()
 			}
 
 			debugPrint("Connected to AP\n");
-			debugPrint("IP address is:");
-			debugPrint(WiFi.localIP());
+			debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+			debugPrintf("Address hex 0x%x\n", (uint32_t)WiFi.localIP());
 			currentState = WiFiState::connected;
 			//digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
 			break;
@@ -879,6 +940,10 @@ void ICACHE_RAM_ATTR ProcessRequest()
 		const size_t dataBufferAvailable = std::min<size_t>(messageHeaderIn.hdr.dataBufferAvailable, MaxDataLength);
 		//debugPrintf("Got request %d\n", messageHeaderIn.hdr.command);
 		// See what command we have received and take appropriate action
+#if STATS
+		requestCounts[(int)messageHeaderIn.hdr.command]++;
+		loopCnt++;
+#endif
 		switch (messageHeaderIn.hdr.command)
 		{
 		case NetworkCommand::nullCommand:					// no command being sent, SAM just wants the network status
@@ -1213,8 +1278,14 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 			{
 				Connection& conn = Connection::Get(messageHeaderIn.hdr.socketNumber);
 				const size_t amount = conn.Read(reinterpret_cast<uint8_t *>(transferBuffer), std::min<size_t>(messageHeaderIn.hdr.dataBufferAvailable, MaxDataLength));
+#if STATS
+				dataIn += amount;
+				//if (amount == 0) readNoData++;
+#endif
 				messageHeaderIn.hdr.param32 = hspi.transfer32(amount);
 				hspi.transferDwords(transferBuffer, nullptr, NumDwords(amount));
+				conn.Poll();
+				if (conn.CanRead() == 0) readNoData++;
 			}
 			else
 			{
@@ -1237,6 +1308,9 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 				{
 					lastError = "incomplete write";
 				}
+#if STATS
+				dataOut += written;
+#endif
 			}
 			else
 			{
@@ -1253,6 +1327,9 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 				conn.GetStatus(resp);
 				Connection::GetSummarySocketStatus(resp.connectedSockets, resp.otherEndClosedSockets);
 				hspi.transferDwords(reinterpret_cast<const uint32_t *>(&resp), nullptr, sizeof(resp));
+#if STATS
+				if (resp.bytesAvailable == 0) statNoData++;
+#endif
 			}
 			else
 			{
@@ -1359,6 +1436,9 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 
 		case NetworkCommand::diagnostics:
 			Connection::ReportConnections();
+#if STATS
+			StatsDisplay();
+#endif			
 			delay(20);										// give the Duet main processor time to digest that
 			stats_display();
 			break;
@@ -1420,7 +1500,7 @@ void setup()
 
     // Set up the fast SPI channel
     hspi.InitMaster(SPI_MODE1, defaultClockControl, true);
-
+	debugPrintf("cpu freq %d free memory %d\n", getCpuFrequencyMhz(), ESP.getFreeHeap());
     Connection::Init();
     Listener::Init();
 #if ESP32

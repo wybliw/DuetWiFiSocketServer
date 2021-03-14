@@ -59,7 +59,7 @@ const uint32_t defaultClockControl = 0x2002;		// 80MHz/3, mark:space 2:1
 
 
 // Pin numbers
-const int SamSSPin = 15;          // GPIO15, output to SAM, SS pin for SPI transfer
+const int SamSSPin = 5;          // GPIO05, output to SAM, SS pin for SPI transfer
 const int EspReqTransferPin = 0;  // GPIO0, output, indicates to the SAM that we want to send something
 const int SamTfrReadyPin = 4;     // GPIO4, input, indicates that SAM is ready to execute an SPI transaction
 

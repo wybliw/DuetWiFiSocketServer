@@ -5,6 +5,457 @@
  *      Author: David
  */
 
+#if ESP32
+#include "Connection.h"
+#include "algorithm"			// for std::min
+#include "Arduino.h"			// for millis
+#include "Config.h"
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "Listener.h"
+const uint32_t MaxWriteTime = 2000;		// how long we wait for a write operation to complete before it is cancelled
+const uint32_t MaxAckTime = 4000;		// how long we wait for a connection to acknowledge the remaining data before it is closed
+
+// Public interface
+Connection::Connection(uint8_t num) :
+#ifdef EXTENDED_LISTEN
+ number(0xff),
+#else
+ number(num),
+#endif
+ state(ConnState::free), localPort(0), remotePort(0), remoteIp(0), closeTimer(0),
+	  inCnt(0), inPos(0), outCnt(0), outPos(0), sock(-1), totalRead(0)
+{
+}
+
+void Connection::GetStatus(ConnStatusResponse& resp)
+{
+	if ((state != ConnState::connected) && (state != ConnState::free))
+	{
+		//debugPrintf("Getstatus num %d %d state %d\n", number, sock, state);
+	}
+	Poll();
+	resp.socketNumber = number;
+	resp.state = state;
+	resp.bytesAvailable = CanRead();
+	resp.writeBufferSpace = CanWrite();
+	resp.localPort = localPort;
+	resp.remotePort = remotePort;
+	resp.remoteIp = remoteIp;
+}
+
+// Close the connection gracefully
+void Connection::Close()
+{
+	//debugPrintf("Close %d state %d\n", sock, state);
+	switch(state)
+	{
+	case ConnState::connected:						// both ends are still connected
+		if (outCnt > 0)
+		{
+			//debugPrintf("outCnt is %d\n", outCnt);
+			closeTimer = millis();
+			SetState(ConnState::closePending);		// wait for the remaining data to be sent before closing
+			//shutdown(sock, SHUT_RD);
+			break;
+		}
+		// no break
+	case ConnState::otherEndClosed:					// the other end has already closed the connection
+	case ConnState::closeReady:						// the other end has closed and we were already closePending
+	default:
+	//debugPrintf("closing %d\n", sock);										// should not happen
+		close(sock);
+		SetState(ConnState::free);
+		break;
+
+	case ConnState::closePending:					// we already asked to close
+		// Should not happen, but if it does just let the close proceed when sending is complete or timeout
+		break;
+	}
+}
+
+// Terminate the connection.
+// If 'external' is true then the Duet main processor has requested termination, so we free up the connection.
+// Otherwise it has failed because of an internal error, and we set the state to 'aborted'. The Duet main processor will see this and send a termination request,
+// which will free it up.
+void Connection::Terminate(bool external)
+{
+	debugPrintf("Terminate num %d sock %d external %d\n", number, sock, external);
+	if (state != ConnState::free && state != ConnState::aborted)
+	{
+		//debugPrintf("Closing num %d sock %d\n", number, sock);
+		close(sock);
+	}
+	SetState((external) ? ConnState::free : ConnState::aborted);
+}
+
+void Connection::WritePoll()
+{
+	if (outCnt > 0)
+	{
+		int ret = write(sock, outBuf + outPos, outCnt);
+		if (ret < 0)
+		{
+			if (errno == EWOULDBLOCK)
+				return;
+			debugPrintf("Write %d len %d failed with %d\n", sock, outCnt, errno);
+			Terminate(false);
+		}
+		//debugPrintf("sock %d outCnt %d written %d outPos %d\n", sock, outCnt, ret, outPos);
+		outCnt -= ret;
+		if (outCnt == 0)
+			outPos = 0;
+		else
+			outPos += ret;
+	}
+}
+
+void Connection::ReadPoll()
+{
+	size_t len = RBUFFER_SIZE - (inPos + inCnt);
+	if (len > 0)
+	{
+		int ret = read(sock, inBuf+inPos+inCnt, len);
+		if (ret < 0)
+		{
+			if (totalRead > 100000) {debugPrintf("read error %d\n", errno);}
+			if (errno == EWOULDBLOCK)
+				return;
+			debugPrintf("Read %d len %d failed with %d\n", sock, len, errno);
+			Terminate(false);
+		}
+		else if (ret == 0)
+		{
+			debugPrintf("poll read %d other end closed\n", sock);
+			SetState(ConnState::otherEndClosed);
+		}
+		else
+		{
+			totalRead += ret;
+			inCnt += ret;
+			//debugPrintf("Poll %d ret is %d inCnt %d\n", sock, ret, inCnt);
+		}
+	}
+}
+		
+// Perform housekeeping tasks
+void Connection::Poll()
+{
+#ifdef EXTENDED_LISTEN
+	if (state == ConnState::free)
+		return;
+	// Are we waiting to be made public?
+	if (number == 0xff)
+		MakePublic();
+#endif
+//debugPrintf("Poll sock %d state %d\n", sock, state);
+	if (state == ConnState::connected)
+	{
+		if (inPos + inCnt < RBUFFER_SIZE) ReadPoll();
+		if (outCnt > 0) WritePoll();
+		if (totalRead > 100000)
+		{
+			debugPrintf("Dumping data cnt %d\n", totalRead);
+    int opts = fcntl(sock, F_GETFL, 0);
+
+	if (opts < 0)
+	{
+		debugPrintf("Could not get socket flags %d", errno);
+	}
+	else if (fcntl(sock, F_SETFL, opts & ~O_NONBLOCK) < 0)
+	{
+		debugPrintf("Could not set non blocking flag %d", errno);
+	}
+			uint32_t start = millis();
+			while(state == ConnState::connected)
+			{
+				//delay(1);
+				inCnt = inPos = 0;
+				ReadPoll();
+			}
+			debugPrintf("End dump cnt %d time %d\n", totalRead, millis() - start);
+		}
+	}
+	else if (state == ConnState::closeReady)
+	{
+		// Deferred close, possibly outside the ISR
+		//debugPrintf("poll closing %d\n", sock);
+		Close();
+	}
+	else if (state == ConnState::closePending)
+	{
+		if (outCnt > 0)
+		{
+			WritePoll();
+			if (outCnt == 0)
+				SetState(ConnState::closeReady);
+			else if (millis() - closeTimer >= MaxAckTime)
+			{
+				debugPrint("Unable to send data force close\n");
+				Terminate(false);
+			}
+		}
+		else
+			if (millis() - closeTimer >= MaxAckTime)
+			{
+				debugPrint("Unable to send data force close\n");
+				SetState(ConnState::closeReady);
+			}
+//		{
+//			// The acknowledgement timer has expired, abort this connection
+//			SetState(ConnState::closeReady);
+//		}
+	}
+}
+
+
+size_t Connection::Write(const uint8_t *data, size_t length, bool doPush, bool closeAfterSending)
+{
+	//debugPrintf("conn %d sock %d write len %d close %d\n", number, sock, length, closeAfterSending);
+	if (state != ConnState::connected)
+	{
+		return 0;
+	}
+	size_t len = WBUFFER_SIZE - (outPos + outCnt);
+	if (len > length) len = length;
+	memcpy(outBuf + outCnt, data, len);
+	outCnt += len;
+	//debugPrintf("write end outCnt %d\n", outCnt);
+	return len;
+}
+
+size_t Connection::CanWrite() const
+{
+	// Return the amount of free space in the write buffer
+	// Note: we cannot necessarily write this amount, because it depends on memory allocations being successful.
+	return (state == ConnState::connected) ? WBUFFER_SIZE - (outPos + outCnt) : 0;
+}
+
+size_t Connection::Read(uint8_t *data, size_t length)
+{
+	size_t lengthRead = length > inCnt ? inCnt : length;
+	memcpy(data, inBuf + inPos, lengthRead);
+	inCnt -= lengthRead;
+	if (inCnt == 0) 
+		inPos = 0;
+	else
+		inPos += lengthRead;
+	//debugPrintf("conn %d read %d\n", sock, lengthRead);
+	return lengthRead;
+}
+
+size_t Connection::CanRead() const
+{
+	return inCnt;
+}
+
+void Connection::Report()
+{
+	// The following must be kept in the same order as the declarations in class ConnState
+	static const char* const connStateText[] =
+	{
+		"free",
+		"connecting",			// socket is trying to connect
+		"connected",			// socket is connected
+		"remoteClosed",			// the other end has closed the connection
+
+		"aborted",				// an error has occurred
+		"closePending",			// close this socket when sending is complete
+		"closeReady"			// about to be closed
+	};
+
+	const unsigned int st = (int)state;
+	ets_printf("%s", (st < ARRAY_SIZE(connStateText)) ? connStateText[st]: "unknown");
+	if (state != ConnState::free)
+	{
+		ets_printf(" %u, %u, %u.%u.%u.%u", localPort, remotePort, remoteIp & 255, (remoteIp >> 8) & 255, (remoteIp >> 16) & 255, (remoteIp >> 24) & 255);
+	}
+}
+
+#ifdef EXTENDED_LISTEN
+void Connection::MakePublic()
+{
+	// make this connection public if we can
+	for(uint32_t i = 0; i < MaxPublicConnections; i++)
+	{
+		// If one of our public connections is not in use, use that slot
+		if (publicConnections[i]->state == ConnState::free)
+		{
+			// Found a public socket that is not in use
+			publicConnections[i]->number = 0xff;
+			number = i;
+			publicConnections[i] = this;
+			return;
+		}
+	}
+}
+#endif
+
+// Callback functions
+int Connection::Accept(int s)
+{
+	//debugPrintf("Accept sock %d on conn %d\n", s, number);
+	sock = s;
+    struct sockaddr_storage addr;
+    socklen_t len = sizeof addr;
+    getpeername(s, (struct sockaddr*)&addr, &len);
+    struct sockaddr_in *sa = (struct sockaddr_in *)&addr;
+	remotePort = ntohs(sa->sin_port);
+	remoteIp = sa->sin_addr.s_addr;
+    len = sizeof addr;
+    getsockname(s, (struct sockaddr*)&addr, &len);
+    sa = (struct sockaddr_in *)&addr;
+	localPort = ntohs(sa->sin_port);
+IPAddress ip(remoteIp);
+//debugPrintf("Ip address %d %d %d %d\n", ip[0], ip[1], ip[2], ip[3]);
+//debugPrintf("Local port is %x, remote %x Ip %x\n", (unsigned)localPort, (unsigned)remotePort, (unsigned)remoteIp);
+	closeTimer = 0;
+	inCnt = outCnt = inPos = outPos = 0;
+	totalRead = 0;
+    int flags = 1; 
+    if (setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (void *)&flags, sizeof(flags)) < 0) 
+	{
+		debugPrintf("Set NO delay error %d\n", errno);
+	}
+    int opts = fcntl(s, F_GETFL, 0);
+
+	if (opts < 0)
+	{
+		debugPrintf("Could not get socket flags %d", errno);
+	}
+	else if (fcntl(s, F_SETFL, opts | O_NONBLOCK) < 0)
+	{
+		debugPrintf("Could not set non blocking flag %d", errno);
+	}
+	SetState(ConnState::connected);
+	return ERR_OK;
+}
+
+
+// Static functions
+/*static*/ Connection *Connection::Allocate()
+{
+	for (size_t i = 0; i < MaxConnections; ++i)
+	{
+		if (connectionList[i]->state == ConnState::free)
+		{
+			return connectionList[i];
+		}
+	}
+	return nullptr;
+}
+
+/*static*/ void Connection::Init()
+{
+	for (size_t i = 0; i < MaxConnections; ++i)
+	{
+		connectionList[i] = new Connection((uint8_t)i);
+	}
+#ifdef EXTENDED_LISTEN
+	for(size_t i = 0; i < MaxPublicConnections; i++)
+	{
+		publicConnections[i] = connectionList[i];
+		publicConnections[i]->number = (uint8_t)i;
+	}
+#endif
+}
+
+/*static*/ uint16_t Connection::CountConnectionsOnPort(uint16_t port)
+{
+	uint16_t count = 0;
+	//debugPrintf("Count conns port %x\n", port);
+	for (size_t i = 0; i < MaxConnections; ++i)
+	{
+		if (connectionList[i]->localPort == port)
+		{
+			const ConnState state = connectionList[i]->state;
+			if (state == ConnState::connected || state == ConnState::otherEndClosed || state == ConnState::closePending)
+			{
+				++count;
+			}
+		}
+	}
+	//debugPrintf("Count conns %d\n", count);
+	return count;
+}
+
+/*static*/ void Connection::PollOne()
+{
+	//Listener::Poll();
+	//debugPrintf("Pollone %d\n", nextConnectionToPoll);
+	uint32_t next = nextConnectionToPoll;
+	do {
+		if (++next == MaxConnections)
+		{
+			Listener::Poll();
+			next = 0;
+		}
+		if (connectionList[next]->state != ConnState::free)
+		{
+			connectionList[next]->Poll();
+			nextConnectionToPoll = next;
+		}
+	} while (next != nextConnectionToPoll);
+}
+
+/*static*/ void Connection::TerminateAll()
+{
+	for (size_t i = 0; i < MaxConnections; ++i)
+	{
+		connectionList[i]->Terminate(true);
+	}
+}
+
+static uint16_t prevOpen = 0;
+static uint16_t prevClosed = 0;
+
+/*static*/ void Connection::GetSummarySocketStatus(uint16_t& connectedSockets, uint16_t& otherEndClosedSockets)
+{
+	connectedSockets = 0;
+	otherEndClosedSockets = 0;
+#ifdef EXTENDED_LISTEN
+	for (size_t i = 0; i < MaxPublicConnections; ++i)
+#else
+	for (size_t i = 0; i < MaxConnections; ++i)
+#endif
+	{
+		if (Connection::Get(i).GetState() == ConnState::connected)
+		{
+			connectedSockets |= (1 << i);
+		}
+		else if (Connection::Get(i).GetState() == ConnState::otherEndClosed)
+		{
+			otherEndClosedSockets |= (1 << i);
+		}
+	}
+	if (connectedSockets != prevOpen || otherEndClosedSockets != prevClosed) 
+	{
+		//debugPrintf("connected %x closed %x\n", connectedSockets, otherEndClosedSockets);
+		prevOpen = connectedSockets;
+		prevClosed = otherEndClosedSockets;
+	}
+}
+
+/*static*/ void Connection::ReportConnections()
+{
+	ets_printf("Conns");
+	for (size_t i = 0; i < MaxConnections; ++i)
+	{
+		ets_printf("%c %u:", (i == 0) ? ':' : ',', i);
+		connectionList[i]->Report();
+	}
+	ets_printf("\n");
+}
+
+// Static data
+Connection *Connection::connectionList[MaxConnections] = { 0 };
+#ifdef EXTENDED_LISTEN
+Connection *Connection::publicConnections[MaxPublicConnections] = { 0 };
+#endif
+size_t Connection::nextConnectionToPoll = 0;
+
+#else
+// End
 #include "Connection.h"
 #include "algorithm"			// for std::min
 #include "Arduino.h"			// for millis
@@ -503,5 +954,5 @@ Connection *Connection::connectionList[MaxConnections] = { 0 };
 Connection *Connection::publicConnections[MaxPublicConnections] = { 0 };
 #endif
 size_t Connection::nextConnectionToPoll = 0;
-
+#endif
 // End

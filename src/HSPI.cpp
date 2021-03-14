@@ -30,6 +30,7 @@ HSPIClass::HSPIClass() {
 
 void HSPIClass::InitMaster(uint8_t mode, uint32_t clockReg, bool msbFirst)
 {
+	//settingsSPI._clock = 16000000;
 	settingsSPI._clock = 16000000;
 	settingsSPI._dataMode = SPI_MODE1;
 	settingsSPI._bitOrder = SPI_MSBFIRST;

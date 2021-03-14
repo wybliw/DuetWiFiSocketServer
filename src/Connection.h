@@ -13,7 +13,73 @@
 #include <cstdint>
 #include <cstddef>
 #include "include/MessageFormats.h"			// for ConnState
+#if ESP32
+#define RBUFFER_SIZE	8192
+#define WBUFFER_SIZE	2048
+class Connection
+{
+public:
+	Connection(uint8_t num);
 
+	// Public interface
+	ConnState GetState() const { return state; }
+	void GetStatus(ConnStatusResponse& resp);
+
+	void Close();
+	void Terminate(bool external);
+	size_t Write(const uint8_t *data, size_t length, bool doPush, bool closeAfterSending);
+	size_t CanWrite() const;
+	size_t Read(uint8_t *data, size_t length);
+	size_t CanRead() const;
+	void Poll();
+
+	// Callback functions
+	int Accept(int s);
+
+	// Static functions
+	static void Init();
+	static Connection *Allocate();
+	#ifdef EXTENDED_LISTEN
+	static Connection& Get(uint8_t num) { return *publicConnections[num]; }
+	#else
+	static Connection& Get(uint8_t num) { return *connectionList[num]; }
+	#endif
+	static uint16_t CountConnectionsOnPort(uint16_t port);
+	static void PollOne();
+	static void ReportConnections();
+	static void GetSummarySocketStatus(uint16_t& connectedSockets, uint16_t& otherEndClosedSockets);
+	static void TerminateAll();
+
+private:
+	void Report();
+	void MakePublic();
+	void WritePoll();
+	void ReadPoll();
+
+	void SetState(ConnState st)
+	{
+		state = st;
+	}
+
+	uint8_t number;
+	volatile ConnState state;
+	uint32_t closeTimer;
+	uint8_t inBuf[RBUFFER_SIZE];
+	uint32_t inCnt, inPos;
+	uint8_t outBuf[WBUFFER_SIZE];
+	uint32_t outCnt, outPos;
+	uint16_t localPort;
+	uint16_t remotePort;
+	uint32_t remoteIp;
+	int sock;
+	uint32_t totalRead;
+	static Connection *connectionList[MaxConnections];
+#ifdef EXTENDED_LISTEN
+	static Connection *publicConnections[MaxPublicConnections];
+#endif
+	static size_t nextConnectionToPoll;
+};
+#else
 // If we #include "tcp.h" here we get clashes between two different ip_addr.h files, so don't do that here
 class tcp_pcb;
 class pbuf;
@@ -86,5 +152,5 @@ private:
 #endif
 	static size_t nextConnectionToPoll;
 };
-
+#endif
 #endif /* SRC_CONNECTION_H_ */
