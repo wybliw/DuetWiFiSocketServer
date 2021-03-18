@@ -16,6 +16,7 @@ extern "C"
 	#include "lwip/init.h"			// for version info
 	#include "lwip/stats.h"			// for stats_display()
 #if ESP32
+
 #elif LWIP_VERSION_MAJOR == 2
 	#include "lwip/apps/mdns.h"
 	#include "lwip/apps/netbiosns.h"
@@ -1326,7 +1327,7 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 				ConnStatusResponse resp;
 				conn.GetStatus(resp);
 				Connection::GetSummarySocketStatus(resp.connectedSockets, resp.otherEndClosedSockets);
-				hspi.transferDwords(reinterpret_cast<const uint32_t *>(&resp), nullptr, sizeof(resp));
+				hspi.transferDwords(reinterpret_cast<const uint32_t *>(&resp), nullptr, NumDwords(sizeof(resp)));
 #if STATS
 				if (resp.bytesAvailable == 0) statNoData++;
 #endif
@@ -1459,6 +1460,8 @@ void ICACHE_RAM_ATTR TransferReadyIsr()
 	transferReadyChanged = true;
 }
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
 void setup()
 {
 	// Enable serial port for debugging
@@ -1468,9 +1471,12 @@ void setup()
 	// Turn off LED
 	//pinMode(ONBOARD_LED, OUTPUT);
 	//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+ESP_LOGI("T", "IRAM_ATTR is %s\n", TOSTRING(IRAM_ATTR));
 
+ESP_LOGI("T", "Socket server running\n");
 	WiFi.mode(WIFI_OFF);
 	WiFi.persistent(false);
+ESP_LOGI("T", "Socket server running2\n");
 
 #if ESP32
 	const esp_reset_reason_t resetInfo = esp_reset_reason();
@@ -1521,6 +1527,7 @@ void setup()
 	whenLastTransactionFinished = millis();
 	lastStatusReportTime = millis();
 	digitalWrite(EspReqTransferPin, HIGH);				// tell the SAM we are ready to receive a command
+ESP_LOGI("T", "Init complete\n");
 #if 0
 	int index;
 	index = -1;

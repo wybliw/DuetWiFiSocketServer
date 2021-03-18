@@ -2,7 +2,8 @@
 
 #ifndef CONFIG_H_INCLUDED
 #define CONFIG_H_INCLUDED
-
+#include "esp_attr.h"
+#define ICACHE_RAM_ATTR IRAM_ATTR
 #define NO_WIFI_SLEEP	0
 
 #define VERSION_MAIN	"1.25-01"

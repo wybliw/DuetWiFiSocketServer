@@ -22,7 +22,7 @@ Listener *Listener::freeList = nullptr;
 
 // Member functions
 Listener::Listener()
-	: next(nullptr), ip(0), port(0), maxConnections(0), protocol(0), sock(0)
+	: next(nullptr), sock(0), ip(0), port(0), maxConnections(0), protocol(0)
 {
 }
 

@@ -23,12 +23,13 @@ Connection::Connection(uint8_t num) :
 #else
  number(num),
 #endif
- state(ConnState::free), localPort(0), remotePort(0), remoteIp(0), closeTimer(0),
-	  inCnt(0), inPos(0), outCnt(0), outPos(0), sock(-1), totalRead(0)
+ state(ConnState::free), closeTimer(0), inCnt(0), inPos(0), outCnt(0), outPos(0), 
+ 	  localPort(0), remotePort(0), remoteIp(0),
+	  sock(-1), totalRead(0)
 {
 }
 
-void Connection::GetStatus(ConnStatusResponse& resp)
+void ICACHE_RAM_ATTR Connection::GetStatus(ConnStatusResponse& resp)
 {
 	if ((state != ConnState::connected) && (state != ConnState::free))
 	{
@@ -89,7 +90,7 @@ void Connection::Terminate(bool external)
 	SetState((external) ? ConnState::free : ConnState::aborted);
 }
 
-void Connection::WritePoll()
+void ICACHE_RAM_ATTR Connection::WritePoll()
 {
 	if (outCnt > 0)
 	{
@@ -110,7 +111,7 @@ void Connection::WritePoll()
 	}
 }
 
-void Connection::ReadPoll()
+void ICACHE_RAM_ATTR Connection::ReadPoll()
 {
 	size_t len = RBUFFER_SIZE - (inPos + inCnt);
 	if (len > 0)
@@ -118,7 +119,6 @@ void Connection::ReadPoll()
 		int ret = read(sock, inBuf+inPos+inCnt, len);
 		if (ret < 0)
 		{
-			if (totalRead > 100000) {debugPrintf("read error %d\n", errno);}
 			if (errno == EWOULDBLOCK)
 				return;
 			debugPrintf("Read %d len %d failed with %d\n", sock, len, errno);
@@ -139,7 +139,7 @@ void Connection::ReadPoll()
 }
 		
 // Perform housekeeping tasks
-void Connection::Poll()
+void ICACHE_RAM_ATTR Connection::Poll()
 {
 #ifdef EXTENDED_LISTEN
 	if (state == ConnState::free)
@@ -153,6 +153,7 @@ void Connection::Poll()
 	{
 		if (inPos + inCnt < RBUFFER_SIZE) ReadPoll();
 		if (outCnt > 0) WritePoll();
+#if 0
 		if (totalRead > 100000)
 		{
 			debugPrintf("Dumping data cnt %d\n", totalRead);
@@ -175,6 +176,7 @@ void Connection::Poll()
 			}
 			debugPrintf("End dump cnt %d time %d\n", totalRead, millis() - start);
 		}
+#endif
 	}
 	else if (state == ConnState::closeReady)
 	{
@@ -209,7 +211,7 @@ void Connection::Poll()
 }
 
 
-size_t Connection::Write(const uint8_t *data, size_t length, bool doPush, bool closeAfterSending)
+size_t ICACHE_RAM_ATTR Connection::Write(const uint8_t *data, size_t length, bool doPush, bool closeAfterSending)
 {
 	//debugPrintf("conn %d sock %d write len %d close %d\n", number, sock, length, closeAfterSending);
 	if (state != ConnState::connected)
@@ -224,14 +226,14 @@ size_t Connection::Write(const uint8_t *data, size_t length, bool doPush, bool c
 	return len;
 }
 
-size_t Connection::CanWrite() const
+size_t ICACHE_RAM_ATTR Connection::CanWrite() const
 {
 	// Return the amount of free space in the write buffer
 	// Note: we cannot necessarily write this amount, because it depends on memory allocations being successful.
 	return (state == ConnState::connected) ? WBUFFER_SIZE - (outPos + outCnt) : 0;
 }
 
-size_t Connection::Read(uint8_t *data, size_t length)
+size_t ICACHE_RAM_ATTR Connection::Read(uint8_t *data, size_t length)
 {
 	size_t lengthRead = length > inCnt ? inCnt : length;
 	memcpy(data, inBuf + inPos, lengthRead);
@@ -244,7 +246,7 @@ size_t Connection::Read(uint8_t *data, size_t length)
 	return lengthRead;
 }
 
-size_t Connection::CanRead() const
+size_t ICACHE_RAM_ATTR Connection::CanRead() const
 {
 	return inCnt;
 }
@@ -379,7 +381,7 @@ IPAddress ip(remoteIp);
 	return count;
 }
 
-/*static*/ void Connection::PollOne()
+/*static*/ void ICACHE_RAM_ATTR Connection::PollOne()
 {
 	//Listener::Poll();
 	//debugPrintf("Pollone %d\n", nextConnectionToPoll);
