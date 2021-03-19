@@ -35,7 +35,7 @@ void ICACHE_RAM_ATTR Connection::GetStatus(ConnStatusResponse& resp)
 	{
 		//debugPrintf("Getstatus num %d %d state %d\n", number, sock, state);
 	}
-	Poll();
+	//Poll();
 	resp.socketNumber = number;
 	resp.state = state;
 	resp.bytesAvailable = CanRead();
@@ -235,20 +235,61 @@ size_t ICACHE_RAM_ATTR Connection::CanWrite() const
 
 size_t ICACHE_RAM_ATTR Connection::Read(uint8_t *data, size_t length)
 {
-	size_t lengthRead = length > inCnt ? inCnt : length;
-	memcpy(data, inBuf + inPos, lengthRead);
-	inCnt -= lengthRead;
-	if (inCnt == 0) 
-		inPos = 0;
+	int ret = read(sock, data, length);
+	if (ret < 0)
+	{
+		if (errno == EWOULDBLOCK)
+			return 0;
+		debugPrintf("Read %d len %d failed with %d\n", sock, length, errno);
+		Terminate(false);
+		ret = 0;
+	}
+	else if (ret == 0)
+	{
+		debugPrintf("poll read %d other end closed\n", sock);
+		SetState(ConnState::otherEndClosed);
+	}
 	else
-		inPos += lengthRead;
-	//debugPrintf("conn %d read %d\n", sock, lengthRead);
-	return lengthRead;
+	{
+		totalRead += ret;
+		//debugPrintf("Poll %d ret is %d inCnt %d\n", sock, ret, inCnt);
+	}
+	return ret;
 }
 
 size_t ICACHE_RAM_ATTR Connection::CanRead() const
 {
+	if (state != ConnState::connected)
+		return inCnt;
+	uint32_t result;
+	int ret = ioctl(sock, FIONREAD, &result);
+	if (ret < 0)
+	{
+		debugPrintf("ioctl error %d\n", errno);
+		return 0;
+	}
+	else
+	{
+		//debugPrintf("socket %d bytes available %d\n", sock, result);
+	}
+	return result + inCnt;
+}
+
+size_t ICACHE_RAM_ATTR Connection::Avail()
+{
 	return inCnt;
+}
+
+uint8_t * ICACHE_RAM_ATTR Connection::ReadAvail(size_t len)
+{
+	uint8_t *ret = inBuf + inPos;
+	inPos += len;
+	inCnt -= len;
+	if (inCnt == 0)
+		inPos = 0;
+	else
+		inPos += len;
+	return ret;
 }
 
 void Connection::Report()

@@ -14,7 +14,7 @@
 #include <cstddef>
 #include "include/MessageFormats.h"			// for ConnState
 #if ESP32
-#define RBUFFER_SIZE	8192
+#define RBUFFER_SIZE	2048
 #define WBUFFER_SIZE	2048
 class Connection
 {
@@ -32,7 +32,8 @@ public:
 	size_t Read(uint8_t *data, size_t length);
 	size_t CanRead() const;
 	void Poll();
-
+	size_t Avail();
+	uint8_t *ReadAvail(size_t len);
 	// Callback functions
 	int Accept(int s);
 
