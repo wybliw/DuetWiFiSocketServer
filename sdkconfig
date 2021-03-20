@@ -127,6 +127,14 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# Example Configuration
+#
+CONFIG_EXAMPLE_IPV4=y
+# CONFIG_EXAMPLE_IPV6 is not set
+CONFIG_EXAMPLE_PORT=3333
+# end of Example Configuration
+
+#
 # Arduino Configuration
 #
 CONFIG_ENABLE_ARDUINO_DEPENDS=y
@@ -195,14 +203,6 @@ CONFIG_ARDUINO_SELECTIVE_WiFi=y
 # CONFIG_ARDUINO_SELECTIVE_WiFiClientSecure is not set
 # CONFIG_ARDUINO_SELECTIVE_Wire is not set
 # end of Arduino Configuration
-
-#
-# Example Configuration
-#
-CONFIG_EXAMPLE_IPV4=y
-# CONFIG_EXAMPLE_IPV6 is not set
-CONFIG_EXAMPLE_PORT=3333
-# end of Example Configuration
 
 #
 # Compiler options
