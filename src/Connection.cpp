@@ -283,7 +283,6 @@ size_t ICACHE_RAM_ATTR Connection::Avail()
 uint8_t * ICACHE_RAM_ATTR Connection::ReadAvail(size_t len)
 {
 	uint8_t *ret = inBuf + inPos;
-	inPos += len;
 	inCnt -= len;
 	if (inCnt == 0)
 		inPos = 0;
