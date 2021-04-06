@@ -859,6 +859,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 	messageHeaderIn.hdr.formatVersion = InvalidFormatVersion;
 	messageHeaderOut.hdr.formatVersion = MyFormatVersion;
 	messageHeaderOut.hdr.state = currentState;
+	messageHeaderOut.hdr.dummy32 = 0xdeadbeef;
 	bool deferCommand = false;
 
 	// Begin the transaction
@@ -1229,7 +1230,7 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 					messageHeaderIn.hdr.param32 = hspi.transfer32(amount);
 					hspi.transferDwords(transferBuffer, nullptr, NumDwords(amount));
 				}
-				conn.Poll();
+				//conn.Poll();
 			}
 			else
 			{
@@ -1309,9 +1310,8 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 			break;
 		}
 	}
-
-	digitalWrite(SamSSPin, HIGH);     						// de-assert CS to SAM to end the transaction and tell SAM the transfer is complete
 	hspi.endTransaction();
+	digitalWrite(SamSSPin, HIGH);     						// de-assert CS to SAM to end the transaction and tell SAM the transfer is complete
 
 	// If we deferred the command until after sending the response (e.g. because it may take some time to execute), complete it now
 	if (deferCommand)

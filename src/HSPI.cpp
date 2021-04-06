@@ -20,6 +20,118 @@
  */
 #include "HSPI.h"
 #if ESP32
+#define USE_NATIVE_SPI 1
+#if USE_NATIVE_SPI
+#include "config.h"
+#include "esp_system.h"
+#include "driver/spi_master.h"
+#include "driver/gpio.h"
+#define DMA_CHAN    2
+
+#define PIN_NUM_MISO 19
+#define PIN_NUM_MOSI 23
+#define PIN_NUM_CLK  18
+#define PIN_NUM_CS   5
+static spi_device_handle_t spi;
+HSPIClass::HSPIClass() {
+}
+
+void HSPIClass::InitMaster(uint8_t mode, uint32_t clockReg, bool msbFirst)
+{
+    pinMode(PIN_NUM_MOSI, OUTPUT);
+    pinMode(PIN_NUM_CLK, OUTPUT);
+    pinMode(PIN_NUM_MISO, INPUT);
+
+    esp_err_t ret;
+    spi_bus_config_t buscfg={
+        .mosi_io_num=PIN_NUM_MOSI,
+        .miso_io_num=PIN_NUM_MISO,
+        .sclk_io_num=PIN_NUM_CLK,
+        .quadwp_io_num=-1,
+        .quadhd_io_num=-1,
+        .max_transfer_sz=4094
+    };
+    spi_device_interface_config_t devcfg={
+        .mode=1,                                //SPI mode 0
+        .clock_speed_hz=20000000,
+        .spics_io_num=-1,               //CS pin
+        .queue_size=4,                          //We want to be able to queue 7 transactions at a time
+    };
+    //Initialize the SPI bus
+    ret=spi_bus_initialize(VSPI_HOST, &buscfg, DMA_CHAN);
+    ESP_ERROR_CHECK(ret);
+    //Attach the LCD to the SPI bus
+    ret=spi_bus_add_device(VSPI_HOST, &devcfg, &spi);
+    ESP_ERROR_CHECK(ret);
+    spi_device_acquire_bus(spi, portMAX_DELAY);
+}
+
+void HSPIClass::end() {
+    spi_device_release_bus(spi);
+}
+
+// Begin a transaction without changing settings
+void ICACHE_RAM_ATTR HSPIClass::beginTransaction() {
+    //spi_device_acquire_bus(spi, portMAX_DELAY);
+}
+
+void ICACHE_RAM_ATTR HSPIClass::endTransaction() {
+    //spi_device_release_bus(spi);
+}
+
+// clockDiv is NOT the required division ratio, it is the value to write to the SPI1CLK register
+void HSPIClass::setClockDivider(uint32_t clockDiv)
+{
+
+}
+
+void HSPIClass::setDataBits(uint16_t bits)
+{
+}
+
+uint32_t ICACHE_RAM_ATTR HSPIClass::transfer32(uint32_t data)
+{
+    esp_err_t ret;
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));       //Zero out the transaction
+    t.length=32;
+    t.tx_buffer=&data;               //The data is the cmd itself
+    ret=spi_device_polling_transmit(spi, &t);  //Transmit!
+    ESP_ERROR_CHECK(ret);
+    return 0;
+}
+uint32_t dummy[1024];
+/**
+ * @param out uint32_t *
+ * @param in  uint32_t *
+ * @param size uint32_t
+ */
+void ICACHE_RAM_ATTR HSPIClass::transferDwords(const uint32_t * out, uint32_t * in, uint32_t size) {
+    // Ignore zero length transfers
+    if (size == 0) 
+        return;
+    esp_err_t ret;
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    t.length=8*4*size;
+    if (out)
+        t.tx_buffer=out;
+    else
+        t.tx_buffer=dummy;
+    if (in)
+    {
+        t.rx_buffer=in;
+        t.rxlength =8*4*size;
+    }
+    ret=spi_device_polling_transmit(spi, &t);  //Transmit!
+    ESP_ERROR_CHECK(ret);
+}
+
+void ICACHE_RAM_ATTR HSPIClass::transferDwords_(const uint32_t * out, uint32_t * in, uint8_t size) {
+
+}
+
+#else
 #include "sdkconfig.h"
 #include "esp32-hal-spi.h"
 #include "SPI.h"
@@ -78,6 +190,7 @@ void ICACHE_RAM_ATTR HSPIClass::transferDwords(const uint32_t * out, uint32_t * 
 void ICACHE_RAM_ATTR HSPIClass::transferDwords_(const uint32_t * out, uint32_t * in, uint8_t size) {
 
 }
+#endif
 #else
 #include "HSPI.h"
 #include <cmath>
