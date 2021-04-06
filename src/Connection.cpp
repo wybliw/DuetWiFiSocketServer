@@ -60,7 +60,7 @@ void Connection::Close()
 			//shutdown(sock, SHUT_RD);
 			break;
 		}
-		// no break
+		[[fallthrough]];
 	case ConnState::otherEndClosed:					// the other end has already closed the connection
 	case ConnState::closeReady:						// the other end has closed and we were already closePending
 	default:
