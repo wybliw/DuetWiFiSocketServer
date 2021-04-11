@@ -870,7 +870,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 
 	if (messageHeaderIn.hdr.formatVersion != MyFormatVersion)
 	{
-		debugPrint("Bad format\n");
+		debugPrintf("Bad format got %02x expected %02x\n", messageHeaderIn.hdr.formatVersion, MyFormatVersion);
 		SendResponse(ResponseBadRequestFormatVersion);
 	}
 	else if (messageHeaderIn.hdr.dataLength > MaxDataLength)
