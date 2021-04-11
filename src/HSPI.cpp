@@ -49,13 +49,16 @@ void HSPIClass::InitMaster(uint8_t mode, uint32_t clockReg, bool msbFirst)
         .sclk_io_num=PIN_NUM_CLK,
         .quadwp_io_num=-1,
         .quadhd_io_num=-1,
-        .max_transfer_sz=4094
+        .max_transfer_sz=4094,
+        .flags = SPICOMMON_BUSFLAG_MASTER|SPICOMMON_BUSFLAG_IOMUX_PINS,
+        .intr_flags = ESP_INTR_FLAG_IRAM
     };
     spi_device_interface_config_t devcfg={
-        .mode=1,                                //SPI mode 0
+        .mode=1,
         .clock_speed_hz=20000000,
-        .spics_io_num=-1,               //CS pin
-        .queue_size=4,                          //We want to be able to queue 7 transactions at a time
+        .spics_io_num=-1,
+        .flags = SPI_DEVICE_NO_DUMMY,
+        .queue_size=4,
     };
     //Initialize the SPI bus
     ret=spi_bus_initialize(VSPI_HOST, &buscfg, DMA_CHAN);
