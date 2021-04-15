@@ -1430,7 +1430,12 @@ ESP_LOGI("T", "Socket server running2\n");
 	// Reserve some flash space for use as EEPROM. The maximum EEPROM supported by the core is SPI_FLASH_SEC_SIZE (4Kb).
 	const size_t eepromSizeNeeded = (MaxRememberedNetworks + 1) * sizeof(WirelessConfigurationData);
 	static_assert(eepromSizeNeeded <= SPI_FLASH_SEC_SIZE, "Insufficient EEPROM");
+#if ESP32
+	debugPrint("Loading nvs from nvs2\n");
+	EEPROM.begin("nvs2", eepromSizeNeeded);
+#else
 	EEPROM.begin(eepromSizeNeeded);
+#endif
 	// Set up the SPI subsystem
     pinMode(SamTfrReadyPin, INPUT);
     pinMode(EspReqTransferPin, OUTPUT);

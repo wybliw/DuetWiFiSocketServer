@@ -25,6 +25,7 @@
 
 #include "EEPROM.h"
 #include <nvs.h>
+#include <nvs_flash.h>
 #include <esp_partition.h>
 #include <esp_log.h>
 
@@ -63,12 +64,17 @@ EEPROMClass::~EEPROMClass() {
   end();
 }
 
-bool EEPROMClass::begin(size_t size) {
+bool EEPROMClass::begin(const char* part_name, size_t size) {
   if (!size) {
       return false;
   }
-
-  esp_err_t res = nvs_open(_name, NVS_READWRITE, &_handle);
+  esp_err_t res = nvs_flash_init_partition(part_name);
+  if (res != ESP_OK) {
+      log_e("Unable to init NVS partition: %d", res);
+      return false;
+  }  
+  res = nvs_open_from_partition(part_name, _name, NVS_READWRITE, &_handle);
+  //esp_err_t res = nvs_open(_name, NVS_READWRITE, &_handle);
   if (res != ESP_OK) {
       log_e("Unable to open NVS namespace: %d", res);
       return false;

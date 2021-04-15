@@ -39,7 +39,7 @@ class EEPROMClass {
     EEPROMClass(void);
     ~EEPROMClass(void);
 
-    bool begin(size_t size);
+    bool begin(const char* part_name, size_t size);
     uint8_t read(int address);
     void write(int address, uint8_t val);
     uint16_t length();
