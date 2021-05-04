@@ -755,7 +755,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 			if (messageHeaderIn.hdr.dataLength == sizeof(WirelessConfigurationData))
 			{
 				messageHeaderIn.hdr.param32 = hspi.transfer32(ResponseEmpty);
-				hspi.transferDwords(nullptr, transferBuffer, SIZE_IN_DWORDS(WirelessConfigurationData));
+				hspi.transferDwords(nullptr, transferBuffer, NumDwords(sizeof(WirelessConfigurationData)));
 				const WirelessConfigurationData * const receivedClientData = reinterpret_cast<const WirelessConfigurationData *>(transferBuffer);
 				int index;
 				if (messageHeaderIn.hdr.command == NetworkCommand::networkConfigureAccessPoint)
@@ -797,9 +797,9 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				int index;
 				if (RetrieveSsidData(reinterpret_cast<char*>(transferBuffer), &index) != nullptr)
 				{
-					WirelessConfigurationData ssidData;
-					memset(&ssidData, 0xFF, sizeof(ssidData));
-					EEPROM.put(index * sizeof(WirelessConfigurationData), ssidData);
+					WirelessConfigurationData localSsidData;
+					memset(&localSsidData, 0xFF, sizeof(localSsidData));
+					EEPROM.put(index * sizeof(WirelessConfigurationData), localSsidData);
 					EEPROM.commit();
 				}
 				else
@@ -1017,7 +1017,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				ConnStatusResponse resp;
 				conn.GetStatus(resp);
 				Connection::GetSummarySocketStatus(resp.connectedSockets, resp.otherEndClosedSockets);
-				hspi.transferDwords(reinterpret_cast<const uint32_t *>(&resp), nullptr, sizeof(resp));
+				hspi.transferDwords(reinterpret_cast<const uint32_t *>(&resp), nullptr, NumDwords(sizeof(resp)));
 			}
 			else
 			{
