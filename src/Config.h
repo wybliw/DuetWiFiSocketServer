@@ -6,7 +6,7 @@
 #define ICACHE_RAM_ATTR IRAM_ATTR
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.25-01"
+#define VERSION_MAIN	"1.26-01"
 
 #ifdef LPCRRF
 #ifdef EXTENDED_LISTEN

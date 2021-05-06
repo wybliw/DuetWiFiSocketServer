@@ -981,7 +981,7 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 			if (messageHeaderIn.hdr.dataLength == sizeof(WirelessConfigurationData))
 			{
 				messageHeaderIn.hdr.param32 = hspi.transfer32(ResponseEmpty);
-				hspi.transferDwords(nullptr, transferBuffer, SIZE_IN_DWORDS(WirelessConfigurationData));
+				hspi.transferDwords(nullptr, transferBuffer, NumDwords(sizeof(WirelessConfigurationData)));
 				const WirelessConfigurationData * const receivedClientData = reinterpret_cast<const WirelessConfigurationData *>(transferBuffer);
 				int index;
 				if (messageHeaderIn.hdr.command == NetworkCommand::networkConfigureAccessPoint)
@@ -1023,9 +1023,9 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 				int index;
 				if (RetrieveSsidData(reinterpret_cast<char*>(transferBuffer), &index) != nullptr)
 				{
-					WirelessConfigurationData ssidData;
-					memset(&ssidData, 0xFF, sizeof(ssidData));
-					EEPROM.put(index * sizeof(WirelessConfigurationData), ssidData);
+					WirelessConfigurationData localSsidData;
+					memset(&localSsidData, 0xFF, sizeof(localSsidData));
+					EEPROM.put(index * sizeof(WirelessConfigurationData), localSsidData);
 					EEPROM.commit();
 				}
 				else
