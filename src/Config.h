@@ -16,6 +16,8 @@
 #endif
 #elif defined(STM32F4)
 #define VERSION_HOSTSYS "S"
+#elif ESP32
+#define VERSION_HOSTSYS "SE"
 #else
 #define VERSION_HOSTSYS "D"
 #endif
