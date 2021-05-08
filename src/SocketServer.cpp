@@ -45,7 +45,6 @@ extern "C"
 #include "pins_arduino.h"
 #include "mdns.h"
 #include "NetBIOS.h"
-//const unsigned int ONBOARD_LED = LED_BUILTIN;				// GPIO 2
 #else
 const unsigned int ONBOARD_LED = D4;				// GPIO 2
 #endif
@@ -944,11 +943,11 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 #if ESP32
 				response->resetReason = 0;
 				response->flashSize = 0;
-				response->rssi = 0;
+				response->rssi = WiFi.RSSI();
 				response->numClients = (runningAsAp) ? 10 : 0;
 				response->sleepMode = (uint8_t)1;
-				response->phyMode = (uint8_t)0;
-				response->vcc = 330;
+				response->phyMode = WiFi.phyMode();
+				response->vcc = 0;
 				// if connected return BSSID of AP to help identification
 				if (runningAsStation)
 					memcpy(response->macAddress, WiFi.BSSID(), 6);

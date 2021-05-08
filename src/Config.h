@@ -2,8 +2,13 @@
 #define DEBUG
 #ifndef CONFIG_H_INCLUDED
 #define CONFIG_H_INCLUDED
-#include "esp_attr.h"
-#define ICACHE_RAM_ATTR IRAM_ATTR
+#if ESP32
+# include "esp_attr.h"
+# ifdef ICACHE_RAM_ATTR
+#  undef ICACHE_RAM_ATTR
+# endif
+# define ICACHE_RAM_ATTR IRAM_ATTR
+#endif
 #define NO_WIFI_SLEEP	0
 
 #define VERSION_MAIN	"1.26-01"

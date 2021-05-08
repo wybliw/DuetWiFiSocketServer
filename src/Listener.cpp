@@ -46,8 +46,7 @@ void Listener::PollAccept()
 		Connection * const conn = Connection::Allocate();
 		if (conn != nullptr)
 		{
-			const int rslt = conn->Accept(ret);
-			//debugPrintf("Accept result is %d\n", rslt);
+			conn->Accept(ret);
 			if (protocol == protocolFtpData)
 			{
 				debugPrintf("accept conn, stop listen on port %u\n", port);
