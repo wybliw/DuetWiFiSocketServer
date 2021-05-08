@@ -84,7 +84,7 @@ public:
     String BSSIDstr();
 
     int8_t RSSI();
-
+    uint8_t phyMode();
     static void _setStatus(wl_status_t status);
 protected:
     static bool _useStaticIp;

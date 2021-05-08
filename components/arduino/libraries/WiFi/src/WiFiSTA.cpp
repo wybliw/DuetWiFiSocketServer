@@ -603,6 +603,25 @@ int8_t WiFiSTAClass::RSSI(void)
 }
 
 /**
+ * Return the current phy mode of the network if configured
+ * @return bssid uint8_t
+ */
+uint8_t WiFiSTAClass::phyMode(void)
+{
+    static uint8_t bssid[6];
+    wifi_ap_record_t info;
+    if(WiFiGenericClass::getMode() == WIFI_MODE_NULL){
+        return 0;
+    }
+    if(!esp_wifi_sta_get_ap_info(&info)) {
+        if (info.phy_11n) return 3;
+        if (info.phy_11g) return 2;
+        if (info.phy_11b) return 1;
+    }
+    return 0;
+}
+
+/**
  * Enable IPv6 on the station interface.
  * @return true on success
  */
