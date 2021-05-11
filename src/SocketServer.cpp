@@ -87,6 +87,7 @@ static WiFiState currentState = WiFiState::idle,
 				prevCurrentState = WiFiState::disabled,
 				lastReportedState = WiFiState::disabled;
 static uint32_t lastBlinkTime = 0;
+static uint32_t dataErrors = 0;
 
 #if !ESP32
 ADC_MODE(ADC_VCC);          // need this for the ESP.getVcc() call to work
@@ -860,7 +861,11 @@ void ICACHE_RAM_ATTR ProcessRequest()
 	messageHeaderOut.hdr.state = currentState;
 	messageHeaderOut.hdr.dummy32 = 0xdeadbeef;
 	bool deferCommand = false;
-
+	if (digitalRead(SamTfrReadyPin) != HIGH)
+	{
+		debugPrint("Sam is not ready\n");
+		return;
+	}
 	// Begin the transaction
 	digitalWrite(SamSSPin, LOW);            // assert CS to SAM
 	hspi.beginTransaction();
@@ -870,12 +875,18 @@ void ICACHE_RAM_ATTR ProcessRequest()
 	if (messageHeaderIn.hdr.formatVersion != MyFormatVersion)
 	{
 		debugPrintf("Bad format got %02x expected %02x\n", messageHeaderIn.hdr.formatVersion, MyFormatVersion);
+		for(int i = 0; i < (headerDwords - 1); i++)
+		{
+			debugPrintf("Header %d = %x\n", i, ((uint32_t *) &messageHeaderIn.hdr)[i]); 
+		}
 		SendResponse(ResponseBadRequestFormatVersion);
+		dataErrors++;
 	}
 	else if (messageHeaderIn.hdr.dataLength > MaxDataLength)
 	{
 		debugPrintf("Bad length %d\n", messageHeaderIn.hdr.dataLength);
 		SendResponse(ResponseBadDataLength);
+		dataErrors++;
 	}
 	else
 	{
@@ -938,9 +949,8 @@ void ICACHE_RAM_ATTR ProcessRequest()
 										  ? static_cast<uint32_t>(WiFi.localIP())
 											  : 0;
 				//response->freeHeap = system_get_free_heap_size();
-debugPrintf("Ip address num %x\n", response->ipAddress); 
-debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
 #if ESP32
+				response->freeHeap = esp_get_free_heap_size();
 				response->resetReason = 0;
 				response->flashSize = 0;
 				response->rssi = WiFi.RSSI();
@@ -948,10 +958,12 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 				response->sleepMode = (uint8_t)1;
 				response->phyMode = WiFi.phyMode();
 				response->vcc = 0;
+				response->clockReg = 0;
 				// if connected return BSSID of AP to help identification
 				if (runningAsStation)
 					memcpy(response->macAddress, WiFi.BSSID(), 6);
 #else
+				response->freeHeap = system_get_free_heap_size();
 				response->resetReason = system_get_rst_info()->reason;
 				response->flashSize = 1u << ((spi_flash_get_id() >> 16) & 0xFF);
 				response->rssi = (runningAsStation) ? wifi_station_get_rssi() : 0;
@@ -1375,6 +1387,9 @@ debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], Wi
 			Connection::ReportConnections();
 			delay(20);										// give the Duet main processor time to digest that
 			stats_display();
+			delay(20);
+			ets_printf("\nData Errors: %d\n", dataErrors);
+			dataErrors = 0;
 			break;
 
 		case NetworkCommand::networkSetClockControl:
@@ -1404,12 +1419,8 @@ void setup()
 	// Turn off LED
 	//pinMode(ONBOARD_LED, OUTPUT);
 	//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
-ESP_LOGI("T", "IRAM_ATTR is %s\n", TOSTRING(IRAM_ATTR));
-
-ESP_LOGI("T", "New Socket server running\n");
 	WiFi.mode(WIFI_OFF);
 	WiFi.persistent(false);
-ESP_LOGI("T", "Socket server running2\n");
 
 #if ESP32
 	const esp_reset_reason_t resetInfo = esp_reset_reason();
@@ -1460,36 +1471,11 @@ ESP_LOGI("T", "Socket server running2\n");
     netbios_init();
 #endif
     lastError = nullptr;
-    debugPrint("Init completed\n");
 	attachInterrupt(SamTfrReadyPin, TransferReadyIsr, CHANGE);
 	whenLastTransactionFinished = millis();
 	lastStatusReportTime = millis();
 	digitalWrite(EspReqTransferPin, HIGH);				// tell the SAM we are ready to receive a command
-ESP_LOGI("T", "Init complete\n");
-#if 0
-	int index;
-	index = -1;
-	WirelessConfigurationData data;
-	memcpy(data.ssid, "gpwlan", 7);
-	memcpy(data.password, "eors-like-thistles", 19);
-	(void)RetrieveSsidData(data.ssid, &index);
-	debugPrintf("index is %d\n", index);
-	if (index < 0)
-	{
-		(void)FindEmptySsidEntry(&index);
-	}
-	debugPrintf("index is %d\n", index);
-	if (index >= 0)
-	{
-		EEPROM.put(index * sizeof(WirelessConfigurationData), data);
-		EEPROM.commit();
-	}
-	else
-	{
-		debugPrint("SSID table full");
-	}
-	StartClient(nullptr);
-#endif
+    debugPrint("Init completed\n");
 }
 
 void loop()
@@ -1517,13 +1503,23 @@ void loop()
 	// See whether there is a request from the SAM.
 	// Duet WiFi 1.04 and earlier have hardware to ensure that TransferReady goes low when a transaction starts.
 	// Duet 3 Mini doesn't, so we need to see TransferReady go low and then high again. In case that happens so fast that we dn't get the interrupt, we have a timeout.
-	if (digitalRead(SamTfrReadyPin) == HIGH && (transferReadyChanged || (millis() - whenLastTransactionFinished > TransferReadyTimeout)))
+	if (digitalRead(SamTfrReadyPin) == HIGH)
 	{
-		//debugPrintf("Seen transfer ready %d changed %d now %u last %u\n", digitalRead(SamTfrReadyPin), transferReadyChanged, millis(), whenLastTransactionFinished);
-		transferReadyChanged = false;
-		ProcessRequest();
-		whenLastTransactionFinished = millis();
+		// now check to see if we have seen a change in the trasnfer ready pin. Note that we check again the state of the pin
+		// just in case it has gone low just after the above check. Not doing this will result in spurious read operations.
+		if ((transferReadyChanged && digitalRead(SamTfrReadyPin) == HIGH) || (millis() - whenLastTransactionFinished > TransferReadyTimeout))
+		{
+			if (!transferReadyChanged) 
+			{
+				debugPrintf("Not seen transfer ready %d changed %d now %u last %u\n", digitalRead(SamTfrReadyPin), transferReadyChanged, millis(), whenLastTransactionFinished);
+			}
+			transferReadyChanged = false;
+			ProcessRequest();
+			whenLastTransactionFinished = millis();
+		}
 	}
+	else
+		transferReadyChanged = true;
 
 	ConnectPoll();
 	Connection::PollOne();
