@@ -1,0 +1,1 @@
+esptool.py --chip esp32 --port com6 write_flash 0x0 .\build\DuetWiFiServer.bin
