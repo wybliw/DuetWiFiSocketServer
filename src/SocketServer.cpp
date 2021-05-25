@@ -45,11 +45,13 @@ extern "C"
 #include "pins_arduino.h"
 #include "mdns.h"
 #include "NetBIOS.h"
+const unsigned int ONBOARD_LED = 32;
 #else
 const unsigned int ONBOARD_LED = D4;				// GPIO 2
 #endif
 const bool ONBOARD_LED_ON = false;					// active low
 const uint32_t ONBOARD_LED_BLINK_INTERVAL = 500;	// ms
+const uint32_t ONBOARD_LED_IO_INTERVAL = 50;
 const uint32_t TransferReadyTimeout = 5;			// how many milliseconds we allow for the Duet to set TransferReady low after the end of a transaction, before we assume that we missed seeing it
 
 #if ESP32 || LWIP_VERSION_MAJOR == 2
@@ -88,6 +90,7 @@ static WiFiState currentState = WiFiState::idle,
 				lastReportedState = WiFiState::disabled;
 static uint32_t lastBlinkTime = 0;
 static uint32_t dataErrors = 0;
+static bool activeIO = false;
 
 #if !ESP32
 ADC_MODE(ADC_VCC);          // need this for the ESP.getVcc() call to work
@@ -429,7 +432,7 @@ void ConnectPoll()
 			debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
 			debugPrintf("Address hex 0x%x\n", (uint32_t)WiFi.localIP());
 			currentState = WiFiState::connected;
-			//digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
+			digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
 			break;
 
 		default:
@@ -455,7 +458,7 @@ void ConnectPoll()
 			{
 				WiFi.mode(WIFI_OFF);
 				currentState = WiFiState::idle;
-				//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+				digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 			}
 		}
 		break;
@@ -487,7 +490,7 @@ void ConnectPoll()
 			debugPrintf("State is %d\n", status);
 				error = "unknown WiFi state";
 				currentState = WiFiState::idle;
-				//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+				digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 				break;
 			}
 			if (millis() - connectStartTime >= MaxConnectTime)
@@ -562,7 +565,7 @@ pre(currentState == WiFiState::idle)
 	{
 		lastError = "network scan failed";
 		currentState = WiFiState::idle;
-		//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+		digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 		return;
 	}
 
@@ -700,7 +703,7 @@ void StartAccessPoint()
 			}
 			SafeStrncpy(currentSsid, apData.ssid, ARRAY_SIZE(currentSsid));
 			currentState = WiFiState::runningAsAccessPoint;
-			//digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
+			digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
 #if ESP32
 			mdns_init();
 			mdns_hostname_set(webHostName);				
@@ -716,7 +719,7 @@ void StartAccessPoint()
 			lastError = "Failed to start access point";
 			debugPrintf("%s\n", lastError);
 			currentState = WiFiState::idle;
-			//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+			digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 		}
 	}
 	else
@@ -724,7 +727,7 @@ void StartAccessPoint()
 		lastError = "invalid access point configuration";
 		debugPrintf("%s\n", lastError);
 		currentState = WiFiState::idle;
-		//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+		digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 	}
 }
 
@@ -1241,6 +1244,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 					messageHeaderIn.hdr.param32 = hspi.transfer32(amount);
 					hspi.transferDwords(transferBuffer, nullptr, NumDwords(amount));
 				}
+				activeIO = true;
 				//conn.Poll();
 			}
 			else
@@ -1264,6 +1268,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				{
 					lastError = "incomplete write";
 				}
+				activeIO = true;
 			}
 			else
 			{
@@ -1376,7 +1381,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 			}
 			delay(100);
 			currentState = WiFiState::idle;
-			//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+			digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 			break;
 
 		case NetworkCommand::networkFactoryReset:			// clear remembered list, reset factory defaults
@@ -1417,8 +1422,8 @@ void setup()
 	//Serial.setDebugOutput(true);
 
 	// Turn off LED
-	//pinMode(ONBOARD_LED, OUTPUT);
-	//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+	pinMode(ONBOARD_LED, OUTPUT);
+	digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 	WiFi.mode(WIFI_OFF);
 	WiFi.persistent(false);
 
@@ -1534,8 +1539,17 @@ void loop()
 				(millis() - lastBlinkTime > ONBOARD_LED_BLINK_INTERVAL))
 	{
 		lastBlinkTime = millis();
-		//digitalWrite(ONBOARD_LED, !digitalRead(ONBOARD_LED));
+		digitalWrite(ONBOARD_LED, !digitalRead(ONBOARD_LED));
 	}
+	if (activeIO && (millis() - lastBlinkTime > ONBOARD_LED_IO_INTERVAL))
+	{
+		const bool currentState = digitalRead(ONBOARD_LED);
+		if (currentState != ONBOARD_LED_ON)
+			activeIO = false;
+		lastBlinkTime = millis();
+		digitalWrite(ONBOARD_LED, !currentState);
+	}
+		
 }
 
 // End
