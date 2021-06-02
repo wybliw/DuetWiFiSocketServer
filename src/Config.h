@@ -11,7 +11,7 @@
 #endif
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.26-01"
+#define VERSION_MAIN	"1.26-02"
 
 #ifdef LPCRRF
 #ifdef EXTENDED_LISTEN
@@ -22,7 +22,7 @@
 #elif defined(STM32F4)
 #define VERSION_HOSTSYS "S"
 #elif ESP32
-#define VERSION_HOSTSYS "SE"
+#define VERSION_HOSTSYS "S32"
 #else
 #define VERSION_HOSTSYS "D"
 #endif

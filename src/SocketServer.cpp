@@ -50,14 +50,23 @@ const unsigned int ONBOARD_LED = 32;
 const unsigned int ONBOARD_LED = D4;				// GPIO 2
 #endif
 const bool ONBOARD_LED_ON = false;					// active low
-const uint32_t ONBOARD_LED_BLINK_INTERVAL = 500;	// ms
+const uint32_t ONBOARD_LED_CONNECTED_INTERVAL = 500;	// ms
 const uint32_t ONBOARD_LED_IO_INTERVAL = 50;
+const uint32_t ONBOARD_LED_BLINK_INTERVAL = 100;
 const uint32_t TransferReadyTimeout = 5;			// how many milliseconds we allow for the Duet to set TransferReady low after the end of a transaction, before we assume that we missed seeing it
 
 #if ESP32 || LWIP_VERSION_MAJOR == 2
 const char * const MdnsProtocolNames[3] = { "HTTP", "FTP", "Telnet" };
 const char * const MdnsServiceStrings[3] = { "_http", "_ftp", "_telnet" };
-const char * const MdnsTxtRecords[2] = { "product=DuetWiFi", "version=" VERSION_MAIN };
+# if ESP32
+ const mdns_txt_item_t MdnsTxtRecords[2] = {
+        {"product", "DuetWiFi"},
+        {"version", VERSION_MAIN},
+    };
+ void RebuildServices();
+# else
+ const char * const MdnsTxtRecords[2] = { "product=DuetWiFi", "version=" VERSION_MAIN };
+# endif
 const unsigned int MdnsTtl = 10 * 60;			// same value as on the Duet 0.6/0.8.5
 #else
 # include <ESP8266mDNS.h>
@@ -102,7 +111,16 @@ static uint32_t transferBuffer[NumDwords(MaxDataLength + 1)];
 
 static const WirelessConfigurationData *ssidData = nullptr;
 	
-
+static void Blink(uint32_t blinkCnt)
+{
+	while (blinkCnt-- > 0)
+	{
+		digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
+		delay(ONBOARD_LED_BLINK_INTERVAL);
+		digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+		delay(ONBOARD_LED_BLINK_INTERVAL);
+	}
+}
 
 // Look up a SSID in our remembered network list, return pointer to it if found
 const WirelessConfigurationData *RetrieveSsidData(const char *ssid, int *index = nullptr)
@@ -425,7 +443,7 @@ void ConnectPoll()
 			else
 			{
 				mdns_init();
-				mdns_hostname_set(webHostName);				
+				RebuildServices();
 			}
 
 			debugPrint("Connected to AP\n");
@@ -541,6 +559,7 @@ void ConnectPoll()
 void StartClient(const char * array ssid)
 pre(currentState == WiFiState::idle)
 {
+	Blink(2);
 	uint8_t *ssidPtr = (ssid != nullptr && ssid[0] != 0 ? (uint8_t *)ssid : nullptr);
 	ssidData = nullptr;
 
@@ -706,7 +725,7 @@ void StartAccessPoint()
 			digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
 #if ESP32
 			mdns_init();
-			mdns_hostname_set(webHostName);				
+			RebuildServices();
 #elif LWIP_VERSION_MAJOR == 2
 			mdns_resp_netif_settings_changed(netif_list->next);		// AP is on second interface
 #else
@@ -744,18 +763,30 @@ static union
 } messageHeaderOut;
 
 #if ESP32
-void GetServiceTxtEntries(struct mdns_service *service, void *txt_userdata)
-{
-}
 void RebuildServices()
 {
+	ESP_ERROR_CHECK(mdns_service_remove_all());
+	ESP_ERROR_CHECK(mdns_hostname_set(webHostName));
+	for (size_t protocol = 0; protocol < 3; protocol++)
+	{
+		const uint16_t port = Listener::GetPortByProtocol(protocol);
+		if (port != 0)
+		{
+			debugPrintf("Add service for protocol %d port %d\n", protocol, port);
+			if (protocol == 0)
+				ESP_ERROR_CHECK(mdns_service_add(webHostName, MdnsServiceStrings[protocol], "_tcp", port, (mdns_txt_item_t*)MdnsTxtRecords, 2));
+			else
+				ESP_ERROR_CHECK(mdns_service_add(webHostName, MdnsServiceStrings[protocol], "_tcp", port, nullptr, 0));
+		}
+	}
 }
+
 void RemoveMdnsServices()
 {
+	mdns_service_remove_all();
+	mdns_free();
 }
-void AdvertiseService(int service, uint16_t port)
-{
-}
+
 #elif LWIP_VERSION_MAJOR == 2
 
 void GetServiceTxtEntries(struct mdns_service *service, void *txt_userdata)
@@ -1380,6 +1411,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				break;
 			}
 			delay(100);
+			WiFi.mode(WIFI_OFF);
 			currentState = WiFiState::idle;
 			digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 			break;
@@ -1464,7 +1496,7 @@ void setup()
     Connection::Init();
     Listener::Init();
 #if ESP32
-	mdns_init();
+	// We need to have initialised the WIFI component before we init mdns
 #elif LWIP_VERSION_MAJOR == 2
     mdns_resp_init();
 	for (struct netif *item = netif_list; item != nullptr; item = item->next)
@@ -1479,6 +1511,7 @@ void setup()
 	attachInterrupt(SamTfrReadyPin, TransferReadyIsr, CHANGE);
 	whenLastTransactionFinished = millis();
 	lastStatusReportTime = millis();
+	Blink(1);
 	digitalWrite(EspReqTransferPin, HIGH);				// tell the SAM we are ready to receive a command
     debugPrint("Init completed\n");
 }
@@ -1536,7 +1569,7 @@ void loop()
 	else if (	(currentState == WiFiState::autoReconnecting ||
 				 currentState == WiFiState::connecting ||
 				 currentState == WiFiState::reconnecting) &&
-				(millis() - lastBlinkTime > ONBOARD_LED_BLINK_INTERVAL))
+				(millis() - lastBlinkTime > ONBOARD_LED_CONNECTED_INTERVAL))
 	{
 		lastBlinkTime = millis();
 		digitalWrite(ONBOARD_LED, !digitalRead(ONBOARD_LED));
