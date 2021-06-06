@@ -60,8 +60,8 @@ const char * const MdnsProtocolNames[3] = { "HTTP", "FTP", "Telnet" };
 const char * const MdnsServiceStrings[3] = { "_http", "_ftp", "_telnet" };
 # if ESP32
  const mdns_txt_item_t MdnsTxtRecords[2] = {
-        {"product", "DuetWiFi"},
         {"version", VERSION_MAIN},
+        {"product", "DuetWiFi"},
     };
  void RebuildServices();
 # else
@@ -100,6 +100,7 @@ static WiFiState currentState = WiFiState::idle,
 static uint32_t lastBlinkTime = 0;
 static uint32_t dataErrors = 0;
 static bool activeIO = false;
+static uint32_t connectCount = 0;
 
 #if !ESP32
 ADC_MODE(ADC_VCC);          // need this for the ESP.getVcc() call to work
@@ -209,10 +210,15 @@ pre(currentState == NetworkState::idle)
 	}
 	else
 		currentBssidPtr = nullptr;
-	WiFi.mode(WIFI_STA);
 #if ESP32
+	// On ESP32 we need to jump through a few hoops to get the hostname passed to the DHCP server
+	WiFi.setHostname(webHostName);
+	WiFi.mode(WIFI_STA);
+	WiFi.disconnect(true);
+	WiFi.config(INADDR_ANY, INADDR_ANY, INADDR_ANY);
 	WiFi.setHostname(webHostName);
 #else
+	WiFi.mode(WIFI_STA);
 	wifi_station_set_hostname(webHostName);     				// must do this before calling WiFi.begin()
 #endif
 	WiFi.setAutoConnect(false);
@@ -238,6 +244,7 @@ pre(currentState == NetworkState::idle)
 		currentState = WiFiState::connecting;
 		connectStartTime = millis();
 	}
+	connectCount++;
 }
 
 #if !ESP32
@@ -440,11 +447,8 @@ void ConnectPoll()
 			{
 				lastError = "Reconnect succeeded";
 			}
-			else
-			{
-				mdns_init();
-				RebuildServices();
-			}
+			mdns_init();
+			RebuildServices();
 
 			debugPrint("Connected to AP\n");
 			debugPrintf("Ip address %d %d %d %d\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
@@ -486,7 +490,7 @@ void ConnectPoll()
 		{
 			// We have just lost the connection
 			connectStartTime = millis();						// start the auto reconnect timer
-
+			debugPrintf("Connection lost status %d\n", status);
 			switch (status)
 			{
 			case WL_IDLE_STATUS:
@@ -505,7 +509,7 @@ void ConnectPoll()
 				break;
 
 			default:
-			debugPrintf("State is %d\n", status);
+			debugPrintf("Unknown state is %d\n", status);
 				error = "unknown WiFi state";
 				currentState = WiFiState::idle;
 				digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
@@ -1425,7 +1429,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 			delay(20);										// give the Duet main processor time to digest that
 			stats_display();
 			delay(20);
-			ets_printf("\nData Errors: %d\n", dataErrors);
+			ets_printf("\nData Errors: %d connect count %d status %d\n", dataErrors, connectCount, WiFi.status());
 			dataErrors = 0;
 			break;
 
