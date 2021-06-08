@@ -11,7 +11,7 @@
 #endif
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.26-02"
+#define VERSION_MAIN	"1.26-03"
 
 #ifdef LPCRRF
 #ifdef EXTENDED_LISTEN
