@@ -26,7 +26,11 @@ extern "C"
 }
 
 #include <cstdarg>
+#if ESP32
 #include <WiFi.h>
+#else
+#include <ESP8266WiFi.h>
+#endif
 #include <DNSServer.h>
 #include <EEPROM.h>
 #include "SocketServer.h"
@@ -913,7 +917,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 	if (messageHeaderIn.hdr.formatVersion != MyFormatVersion)
 	{
 		debugPrintf("Bad format got %02x expected %02x\n", messageHeaderIn.hdr.formatVersion, MyFormatVersion);
-		for(int i = 0; i < (headerDwords - 1); i++)
+		for(size_t i = 0; i < (headerDwords - 1); i++)
 		{
 			debugPrintf("Header %d = %x\n", i, ((uint32_t *) &messageHeaderIn.hdr)[i]); 
 		}
@@ -1280,7 +1284,6 @@ void ICACHE_RAM_ATTR ProcessRequest()
 					hspi.transferDwords(transferBuffer, nullptr, NumDwords(amount));
 				}
 				activeIO = true;
-				//conn.Poll();
 			}
 			else
 			{
@@ -1453,10 +1456,11 @@ void ICACHE_RAM_ATTR TransferReadyIsr()
 #define TOSTRING(x) STRINGIFY(x)
 void setup()
 {
+#if !ESP32
 	// Enable serial port for debugging
-	//Serial.begin(WiFiBaudRate);
-	//Serial.setDebugOutput(true);
-
+	Serial.begin(WiFiBaudRate);
+	Serial.setDebugOutput(true);
+#endif
 	// Turn off LED
 	pinMode(ONBOARD_LED, OUTPUT);
 	digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
@@ -1484,6 +1488,7 @@ void setup()
 #if ESP32
 	debugPrint("Loading nvs from nvs2\n");
 	EEPROM.begin("nvs2", eepromSizeNeeded);
+	debugPrintf("cpu freq %d free memory %d\n", getCpuFrequencyMhz(), ESP.getFreeHeap());
 #else
 	EEPROM.begin(eepromSizeNeeded);
 #endif
@@ -1496,7 +1501,6 @@ void setup()
 
     // Set up the fast SPI channel
     hspi.InitMaster(SPI_MODE1, defaultClockControl, true);
-	debugPrintf("cpu freq %d free memory %d\n", getCpuFrequencyMhz(), ESP.getFreeHeap());
     Connection::Init();
     Listener::Init();
 #if ESP32
@@ -1553,7 +1557,7 @@ void loop()
 		{
 			if (!transferReadyChanged) 
 			{
-				debugPrintf("Not seen transfer ready %d changed %d now %u last %u\n", digitalRead(SamTfrReadyPin), transferReadyChanged, millis(), whenLastTransactionFinished);
+				debugPrintf("Not seen transfer ready %d changed %d now %u last %u\n", digitalRead(SamTfrReadyPin), transferReadyChanged, (unsigned)millis(), (unsigned)whenLastTransactionFinished);
 			}
 			transferReadyChanged = false;
 			ProcessRequest();

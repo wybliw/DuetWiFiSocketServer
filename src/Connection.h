@@ -101,6 +101,8 @@ public:
 	size_t Read(uint8_t *data, size_t length);
 	size_t CanRead() const;
 	void Poll();
+	size_t Avail() {return 0;}
+	uint8_t *ReadAvail(size_t len) {return nullptr;}
 
 	// Callback functions
 	int Accept(tcp_pcb *pcb);

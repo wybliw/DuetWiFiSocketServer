@@ -20,8 +20,6 @@
  */
 #include "HSPI.h"
 #if ESP32
-#define USE_NATIVE_SPI 1
-#if USE_NATIVE_SPI
 #include "config.h"
 #include "esp_system.h"
 #include "driver/spi_master.h"
@@ -134,66 +132,6 @@ void ICACHE_RAM_ATTR HSPIClass::transferDwords_(const uint32_t * out, uint32_t *
 
 }
 
-#else
-#include "sdkconfig.h"
-#include "esp32-hal-spi.h"
-#include "SPI.h"
-SPISettings settingsSPI;
-SPIClass vspi(VSPI);
-HSPIClass::HSPIClass() {
-}
-
-void HSPIClass::InitMaster(uint8_t mode, uint32_t clockReg, bool msbFirst)
-{
-	//settingsSPI._clock = 16000000;
-	settingsSPI._clock = 20000000;
-	settingsSPI._dataMode = SPI_MODE1;
-	settingsSPI._bitOrder = SPI_MSBFIRST;
-    vspi.begin(-1, -1, -1, -1);
-}
-
-void HSPIClass::end() {
-}
-
-// Begin a transaction without changing settings
-void ICACHE_RAM_ATTR HSPIClass::beginTransaction() {
-    vspi.beginTransaction(settingsSPI);
-}
-
-void ICACHE_RAM_ATTR HSPIClass::endTransaction() {
-    vspi.endTransaction();
-}
-
-// clockDiv is NOT the required division ratio, it is the value to write to the SPI1CLK register
-void HSPIClass::setClockDivider(uint32_t clockDiv)
-{
-
-}
-
-void HSPIClass::setDataBits(uint16_t bits)
-{
-}
-
-uint32_t ICACHE_RAM_ATTR HSPIClass::transfer32(uint32_t data)
-{
-    //vspi.transfer32(data);
-    vspi.transferBytes((uint8_t *)&data, (uint8_t *)nullptr, 4);
-    return 0;
-}
-
-/**
- * @param out uint32_t *
- * @param in  uint32_t *
- * @param size uint32_t
- */
-void ICACHE_RAM_ATTR HSPIClass::transferDwords(const uint32_t * out, uint32_t * in, uint32_t size) {
-    vspi.transferBytes((uint8_t *)out, (uint8_t *)in, size*4);
-}
-
-void ICACHE_RAM_ATTR HSPIClass::transferDwords_(const uint32_t * out, uint32_t * in, uint8_t size) {
-
-}
-#endif
 #else
 #include "HSPI.h"
 #include <cmath>

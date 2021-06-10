@@ -1,5 +1,4 @@
 // Configuration for RepRapWiFi
-#define DEBUG
 #ifndef CONFIG_H_INCLUDED
 #define CONFIG_H_INCLUDED
 #if ESP32
@@ -65,11 +64,16 @@ const uint32_t defaultClockControl = 0x4002;	// 80MHz/5 16MHz 3:2 - maybe!
 const uint32_t defaultClockControl = 0x2002;		// 80MHz/3, mark:space 2:1
 #endif
 
-
 // Pin numbers
+#if ESP32
 const int SamSSPin = 5;          // GPIO05, output to SAM, SS pin for SPI transfer
 const int EspReqTransferPin = 0;  // GPIO0, output, indicates to the SAM that we want to send something
 const int SamTfrReadyPin = 4;     // GPIO4, input, indicates that SAM is ready to execute an SPI transaction
+#else
+const int SamSSPin = 15;          // GPIO15, output to SAM, SS pin for SPI transfer
+const int EspReqTransferPin = 0;  // GPIO0, output, indicates to the SAM that we want to send something
+const int SamTfrReadyPin = 4;     // GPIO4, input, indicates that SAM is ready to execute an SPI transaction
+#endif
 
 const uint8_t Backlog = 8;
 

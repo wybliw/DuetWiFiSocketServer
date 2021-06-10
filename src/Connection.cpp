@@ -497,7 +497,6 @@ Connection *Connection::publicConnections[MaxPublicConnections] = { 0 };
 size_t Connection::nextConnectionToPoll = 0;
 
 #else
-// End
 #include "Connection.h"
 #include "algorithm"			// for std::min
 #include "Arduino.h"			// for millis
@@ -514,7 +513,6 @@ extern "C"
 
 	static void conn_err(void *arg, err_t err)
 	{
-		debugPrintf("conn err %d", err);
 		if (arg != nullptr)
 		{
 			((Connection*)arg)->ConnError(err);
@@ -523,7 +521,6 @@ extern "C"
 
 	static err_t conn_recv(void *arg, tcp_pcb *pcb, pbuf *p, err_t err)
 	{
-		debugPrintf("con recv err %d\n", err);
 		if (arg != nullptr)
 		{
 			return ((Connection*)arg)->ConnRecv(p, err);
@@ -533,7 +530,6 @@ extern "C"
 
 	static err_t conn_sent(void *arg, tcp_pcb *pcb, u16_t len)
 	{
-		debugPrintf("conn sent len %d\n", len);
 		if (arg != nullptr)
 		{
 			return ((Connection*)arg)->ConnSent(len);
@@ -681,7 +677,6 @@ void Connection::Poll()
 // call in version 1.21. So I have increased it from 10 to 16, which seems to have fixed the problem..
 size_t Connection::Write(const uint8_t *data, size_t length, bool doPush, bool closeAfterSending)
 {
-	debugPrintf("write len %d\n", length);
 	if (state != ConnState::connected)
 	{
 		return 0;
@@ -714,7 +709,6 @@ size_t Connection::Write(const uint8_t *data, size_t length, bool doPush, bool c
 		closeTimer = millis();
 		SetState(ConnState::closePending);
 	}
-	debugPrint("write end\n");
 	return length;
 }
 
@@ -810,21 +804,15 @@ void Connection::MakePublic()
 // Callback functions
 int Connection::Accept(tcp_pcb *pcb)
 {
-	debugPrint("accept 1\n");
 	ownPcb = pcb;
 	tcp_arg(pcb, this);				// tell LWIP that this is the structure we wish to be passed for our callbacks
-	debugPrint("accept 2\n");
 	tcp_recv(pcb, conn_recv);		// tell LWIP that we wish to be informed of incoming data by a call to the conn_recv() function
-	debugPrint("accept 3\n");
 	tcp_sent(pcb, conn_sent);
-	debugPrint("accept 4\n");
 	tcp_err(pcb, conn_err);
-	debugPrint("accept 5\n");
 	SetState(ConnState::connected);
-	debugPrint("accept 6\n");
 	localPort = pcb->local_port;
 	remotePort = pcb->remote_port;
-	remoteIp = pcb->remote_ip.u_addr.ip4.addr;
+	remoteIp = pcb->remote_ip.addr;
 	writeTimer = closeTimer = 0;
 	unAcked = readIndex = alreadyRead = 0;
 	return ERR_OK;
