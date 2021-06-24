@@ -307,7 +307,7 @@ void ConnectPoll()
 
 			debugPrint("Connected to AP\n");
 			currentState = WiFiState::connected;
-			//digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
+			digitalWrite(ONBOARD_LED, ONBOARD_LED_ON);
 			break;
 
 		default:
@@ -328,7 +328,7 @@ void ConnectPoll()
 			{
 				WiFi.mode(WIFI_OFF);
 				currentState = WiFiState::idle;
-				//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+				digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 			}
 		}
 		break;
@@ -354,7 +354,7 @@ void ConnectPoll()
 			case STATION_WRONG_PASSWORD:
 				error = "state 'wrong password'";
 				currentState = WiFiState::idle;
-				//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+				digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 				break;
 
 			case STATION_NO_AP_FOUND:
@@ -370,7 +370,7 @@ void ConnectPoll()
 			default:
 				error = "unknown WiFi state";
 				currentState = WiFiState::idle;
-				//digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
+				digitalWrite(ONBOARD_LED, !ONBOARD_LED_ON);
 				break;
 			}
 
