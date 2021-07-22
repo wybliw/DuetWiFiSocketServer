@@ -49,11 +49,12 @@ extern "C"
 #include "pins_arduino.h"
 #include "mdns.h"
 #include "NetBIOS.h"
+const bool ONBOARD_LED_ON = true;					// active high
 const unsigned int ONBOARD_LED = 32;
 #else
+const bool ONBOARD_LED_ON = false;					// active low
 const unsigned int ONBOARD_LED = D4;				// GPIO 2
 #endif
-const bool ONBOARD_LED_ON = false;					// active low
 const uint32_t ONBOARD_LED_CONNECTED_INTERVAL = 500;	// ms
 const uint32_t ONBOARD_LED_IO_INTERVAL = 50;
 const uint32_t ONBOARD_LED_BLINK_INTERVAL = 100;
@@ -1522,6 +1523,7 @@ void setup()
 	Blink(1);
 	digitalWrite(EspReqTransferPin, HIGH);				// tell the SAM we are ready to receive a command
     debugPrint("Init completed\n");
+	debugPrintfAlways("\n\nDuetWiFiSocketServer version %s ready\n\n", firmwareVersion);
 }
 
 void loop()
