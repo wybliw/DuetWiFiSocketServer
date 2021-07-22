@@ -1,7 +1,8 @@
 
-
+set MSYSTEM=
+rem %HOMEPATH%\esp\esp-idf\export.bat
 rem first build the project using cmake/idf.py
-rem idf.py clean
+idf.py clean
 idf.py all
 rem now generate the combined binary image
 cd build
