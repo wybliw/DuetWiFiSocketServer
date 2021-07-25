@@ -18,14 +18,14 @@ rm -f ${OUTPUT}/*
 make BUILD=build clean
 make -j2 BUILD=build HOSTSYS="-DLPCRRF -DEXTENDED_LISTEN"
 if [ -f ./build/DuetWiFiServer.bin ]; then
-	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp8256-lpc-${VER}.bin
+	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp8266-lpc-${VER}.bin
 fi 
 
 #Building STM32F4 Firmware
 make BUILD=build clean
 make -j2 BUILD=build HOSTSYS=-DSTM32F4
 if [ -f ./build/DuetWiFiServer.bin ]; then
-	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp8256-stm32f4-${VER}.bin
+	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp8266-stm32f4-${VER}.bin
 fi 
 
 #Building Duet firmware
