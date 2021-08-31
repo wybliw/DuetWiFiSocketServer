@@ -138,15 +138,17 @@ const WirelessConfigurationData *RetrieveSsidData(const char *ssid, int *index =
 #else
 		const WirelessConfigurationData *wp = reinterpret_cast<const WirelessConfigurationData*>(EEPROM.getConstDataPtr()+(i * sizeof(WirelessConfigurationData)));
 #endif
+#if 0
 		if (wp == nullptr || wp->ssid[0] == 0xFF)
 			debugPrint("eeprom data is null/empty\n");
 		else
 		{
 			debugPrintf("slot %d entry %s %s\n", i, wp->ssid, wp->password);
 		}
+#endif
 		if (wp != nullptr && strncmp(ssid, wp->ssid, sizeof(wp->ssid)) == 0)
 		{
-			debugPrint("Found entry\n");
+			//debugPrint("Found entry\n");
 			if (index != nullptr)
 			{
 				*index = i;
@@ -1056,6 +1058,13 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				{
 					EEPROM.put(index * sizeof(WirelessConfigurationData), *receivedClientData);
 					EEPROM.commit();
+					// Read the data back to check it is valid
+					const WirelessConfigurationData *wcd = RetrieveSsidData(receivedClientData->ssid, &index);
+					if (wcd == nullptr || memcmp(wcd, receivedClientData, sizeof(WirelessConfigurationData)))
+					{
+						debugPrintf("Failed to save configuration data slot %d\n", index);
+						lastError = "SSID verify error";
+					} 
 				}
 				else
 				{
