@@ -222,11 +222,13 @@ pre(currentState == NetworkState::idle)
 	WiFi.setHostname(webHostName);
 	WiFi.mode(WIFI_STA);
 	WiFi.disconnect(true);
-	WiFi.config(INADDR_ANY, INADDR_ANY, INADDR_ANY);
+	WiFi.config(IPAddress(apData.ip), IPAddress(apData.gateway), IPAddress(apData.netmask));
+
 	WiFi.setHostname(webHostName);
 #else
 	WiFi.mode(WIFI_STA);
 	wifi_station_set_hostname(webHostName);     				// must do this before calling WiFi.begin()
+	WiFi.config(IPAddress(apData.ip), IPAddress(apData.gateway), IPAddress(apData.netmask), IPAddress(), IPAddress());
 #endif
 	WiFi.setAutoConnect(false);
 //	WiFi.setAutoReconnect(false);								// auto reconnect NEVER works in our configuration so disable it, it just wastes time
@@ -238,7 +240,6 @@ pre(currentState == NetworkState::idle)
 	wifi_set_sleep_type(MODEM_SLEEP_T);
 #endif
 #endif
-	//WiFi.config(IPAddress(apData.ip), IPAddress(apData.gateway), IPAddress(apData.netmask), IPAddress(), IPAddress());
 	debugPrintf("Trying to connect to ssid \"%s\" with password \"%s\"\n", apData.ssid, apData.password);
 	WiFi.begin(apData.ssid, apData.password, 0, currentBssidPtr);
 
