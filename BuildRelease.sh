@@ -37,11 +37,9 @@ fi
 
 make BUILD=build clean
 # Building esp32 version (ugly!)
-cmd << EOF
-set MSYSTEM=
-%HOMEPATH%\esp\esp-idf\export.bat
+cmd << EOFXXX
 .\buildesp32.cmd
-EOF
+EOFXXX
 if [ -f ./build/DuetWiFiServer.bin ]; then
 	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp32-stm32f4-${VER}.bin
 fi

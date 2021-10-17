@@ -1,6 +1,6 @@
 
 set MSYSTEM=
-rem %HOMEPATH%\esp\esp-idf\export.bat
+call %HOMEPATH%\esp\esp-idf\export.bat
 rem first build the project using cmake/idf.py
 idf.py clean
 idf.py all
