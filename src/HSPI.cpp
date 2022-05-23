@@ -53,13 +53,14 @@ void HSPIClass::InitMaster(uint8_t mode, uint32_t clockReg, bool msbFirst)
     };
     spi_device_interface_config_t devcfg={
         .mode=1,
-        .clock_speed_hz=20000000,
+        .clock_speed_hz=SPI_MASTER_FREQ_40M,
         .spics_io_num=-1,
         .flags = SPI_DEVICE_NO_DUMMY,
         .queue_size=4,
     };
     //Initialize the SPI bus
-    ret=spi_bus_initialize(VSPI_HOST, &buscfg, DMA_CHAN);
+    //ret=spi_bus_initialize(VSPI_HOST, &buscfg, DMA_CHAN);
+    ret=spi_bus_initialize(VSPI_HOST, &buscfg, 0);
     ESP_ERROR_CHECK(ret);
     //Attach the LCD to the SPI bus
     ret=spi_bus_add_device(VSPI_HOST, &devcfg, &spi);
@@ -98,10 +99,14 @@ uint32_t ICACHE_RAM_ATTR HSPIClass::transfer32(uint32_t data)
     t.length=32;
     t.tx_buffer=&data;               //The data is the cmd itself
     ret=spi_device_polling_transmit(spi, &t);  //Transmit!
+    if (ret != ESP_OK)
+    {
+        debugPrintfAlways("T32 len %d\n", t.length);
+    }
     ESP_ERROR_CHECK(ret);
     return 0;
 }
-uint32_t dummy[1024];
+uint32_t dummy[2048];
 /**
  * @param out uint32_t *
  * @param in  uint32_t *
@@ -114,18 +119,33 @@ void ICACHE_RAM_ATTR HSPIClass::transferDwords(const uint32_t * out, uint32_t * 
     esp_err_t ret;
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
-    t.length=8*4*size;
-    if (out)
-        t.tx_buffer=out;
-    else
-        t.tx_buffer=dummy;
-    if (in)
+    uint32_t cnt = size;
+    uint32_t offset = 0;
+    while (cnt > 0)
     {
-        t.rx_buffer=in;
-        t.rxlength =8*4*size;
+        //uint32_t len = (cnt > 64/4 ? 64/4 : cnt);
+        uint32_t len = cnt;
+        t.length=8*4*len;
+        if (out)
+            t.tx_buffer=out + offset;
+        else
+            t.tx_buffer=dummy;
+        if (in)
+        {
+            t.rx_buffer=in + offset;
+            t.rxlength =8*4*len;
+        }
+        else
+            t.rxlength = 0;
+        ret=spi_device_polling_transmit(spi, &t);  //Transmit!
+        if (ret != ESP_OK)
+        {
+            debugPrintfAlways("rx len %d tx len %d len %d cnt %d\n", t.rxlength, t.length, len, cnt);
+        }
+        ESP_ERROR_CHECK(ret);
+        cnt -= len;
+        offset += len;
     }
-    ret=spi_device_polling_transmit(spi, &t);  //Transmit!
-    ESP_ERROR_CHECK(ret);
 }
 
 void ICACHE_RAM_ATTR HSPIClass::transferDwords_(const uint32_t * out, uint32_t * in, uint8_t size) {
