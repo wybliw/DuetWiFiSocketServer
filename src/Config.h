@@ -10,7 +10,7 @@
 #endif
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.26-08"
+#define VERSION_MAIN	"1.26-09"
 
 #ifdef LPCRRF
 #ifdef EXTENDED_LISTEN
@@ -44,6 +44,18 @@ const char* const firmwareVersion = VERSION_MAIN VERSION_HOSTSYS VERSION_DEBUG V
 // ************ This must be kept in step with the corresponding value in RepRapFirmware *************
 const uint32_t maxSpiFileData = 2048;
 
+#if ESP32
+// ESP32 clock control
+// The actual numbers used ar arbitary and have been choosen to provide some degree
+// of backwards compatibility with the Duet3D code
+const uint32_t spi20MHzDMA = 0x2003;
+const uint32_t spi26MHzDMA = 0x2002;
+const uint32_t spi40MHzDMA = 0x2001;
+const uint32_t spi20MHzPoll = 0x4003;
+const uint32_t spi26MHzPoll = 0x4002;
+const uint32_t spi40MHzPoll = 0x4001;
+const uint32_t defaultClockControl = spi20MHzDMA;
+#else
 // Define the SPI clock register
 // Useful values of the register are:
 // 0x1001	40MHz 1:1
@@ -51,7 +63,6 @@ const uint32_t maxSpiFileData = 2048;
 // 0x2402	26.7MHz 1:2
 // 0x2002	26.7MHz 2:1
 // 0x3043	20MHz 2:2
-
 // Define the SPI clock frequency
 #ifdef LPCRRF
 //SD:: LPC as a slave can only up to 1/12th PCLK. 7M was getting some errors, 6M seems stable.
@@ -62,6 +73,7 @@ const uint32_t defaultClockControl = 0x4002;	// 80MHz/5 16MHz 3:2 - maybe!
 // The SAM occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.
 // Due to the 15ns SCLK to MISO delay of the SAMD51, 2:1 is preferred over 1:2
 const uint32_t defaultClockControl = 0x2002;		// 80MHz/3, mark:space 2:1
+#endif
 #endif
 
 // Pin numbers

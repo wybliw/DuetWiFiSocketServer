@@ -38,6 +38,7 @@ public:
   void end();
   void setDataBits(uint16_t bits);
   void setClockDivider(uint32_t clockDiv);
+  uint32_t getClockDivider();
   void beginTransaction();
   uint32_t transfer32(uint32_t data);
   void transferDwords(const uint32_t * out, uint32_t * in, uint32_t size);

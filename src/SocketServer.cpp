@@ -1004,7 +1004,7 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				response->sleepMode = (uint8_t)1;
 				response->phyMode = WiFi.phyMode();
 				response->vcc = 0;
-				response->clockReg = 0;
+				response->clockReg = hspi.getClockDivider();;
 				// if connected return BSSID of AP to help identification
 				if (runningAsStation)
 					memcpy(response->macAddress, WiFi.BSSID(), 6);
