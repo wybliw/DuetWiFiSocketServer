@@ -25,7 +25,7 @@ fi
 make BUILD=build clean
 make -j2 BUILD=build HOSTSYS=-DSTM32F4
 if [ -f ./build/DuetWiFiServer.bin ]; then
-	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp8266-stm32f4-${VER}.bin
+	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp8266-stm32-${VER}.bin
 fi 
 
 #Building Duet firmware
@@ -41,7 +41,7 @@ cmd << EOFXXX
 .\buildesp32.cmd
 EOFXXX
 if [ -f ./build/DuetWiFiServer.bin ]; then
-	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp32-stm32f4-${VER}.bin
+	mv ./build/DuetWiFiServer.bin ${OUTPUT}/DuetWiFiServer-esp32-stm32-${VER}.bin
 fi
 
 make BUILD=build clean
