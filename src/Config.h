@@ -10,7 +10,7 @@
 #endif
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.26-09"
+#define VERSION_MAIN	"1.27beta1-01"
 
 #ifdef LPCRRF
 #ifdef EXTENDED_LISTEN
@@ -70,7 +70,7 @@ const uint32_t defaultClockControl = 0x181001; //  80MHz/7/2 5.71MHz 1:1
 #elif defined(STM32F4)
 const uint32_t defaultClockControl = 0x4002;	// 80MHz/5 16MHz 3:2 - maybe!
 #else
-// The SAM occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.
+// The SAM4E occasionally transmits incorrect data at 40MHz, so we now use 26.7MHz.
 // Due to the 15ns SCLK to MISO delay of the SAMD51, 2:1 is preferred over 1:2
 const uint32_t defaultClockControl = 0x2002;		// 80MHz/3, mark:space 2:1
 #endif

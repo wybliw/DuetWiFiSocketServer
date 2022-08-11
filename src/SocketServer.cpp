@@ -1532,7 +1532,7 @@ void setup()
 	lastStatusReportTime = millis();
 	Blink(1);
 	digitalWrite(EspReqTransferPin, HIGH);				// tell the SAM we are ready to receive a command
-    debugPrint("Init completed\n");
+	debugPrint("Init completed\n");
 	debugPrintfAlways("\n\nDuetWiFiSocketServer version %s ready\n\n", firmwareVersion);
 }
 
