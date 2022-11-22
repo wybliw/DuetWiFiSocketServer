@@ -1008,6 +1008,8 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				// if connected return BSSID of AP to help identification
 				if (runningAsStation)
 					memcpy(response->macAddress, WiFi.BSSID(), 6);
+				else
+					esp_efuse_mac_get_default(response->macAddress);
 #else
 				response->freeHeap = system_get_free_heap_size();
 				response->resetReason = system_get_rst_info()->reason;
@@ -1059,13 +1061,16 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				{
 					EEPROM.put(index * sizeof(WirelessConfigurationData), *receivedClientData);
 					EEPROM.commit();
-					// Read the data back to check it is valid
-					const WirelessConfigurationData *wcd = RetrieveSsidData(receivedClientData->ssid, &index);
-					if (wcd == nullptr || memcmp(wcd, receivedClientData, sizeof(WirelessConfigurationData)))
+					if (index > 0)
 					{
-						debugPrintf("Failed to save configuration data slot %d\n", index);
-						lastError = "SSID verify error";
-					} 
+						// Read the data back to check it is valid
+						const WirelessConfigurationData *wcd = RetrieveSsidData(receivedClientData->ssid, &index);
+						if (wcd == nullptr || memcmp(wcd, receivedClientData, sizeof(WirelessConfigurationData)))
+						{
+							debugPrintf("Failed to save configuration data slot %d\n", index);
+							lastError = "SSID verify error";
+						}
+					}
 				}
 				else
 				{
