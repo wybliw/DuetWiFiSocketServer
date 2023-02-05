@@ -348,7 +348,7 @@ int Connection::Accept(int s)
     getsockname(s, (struct sockaddr*)&addr, &len);
     sa = (struct sockaddr_in *)&addr;
 	localPort = ntohs(sa->sin_port);
-IPAddress ip(remoteIp);
+//IPAddress ip(remoteIp);
 //debugPrintf("Ip address %d %d %d %d\n", ip[0], ip[1], ip[2], ip[3]);
 //debugPrintf("Local port is %x, remote %x Ip %x\n", (unsigned)localPort, (unsigned)remotePort, (unsigned)remoteIp);
 	closeTimer = 0;

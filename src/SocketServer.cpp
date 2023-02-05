@@ -114,6 +114,7 @@ static HSPIClass hspi;
 static uint32_t connectStartTime;
 static uint32_t lastStatusReportTime;
 static uint32_t transferBuffer[NumDwords(MaxDataLength + 1)];
+static bool WiFiInitialised = false;
 
 static const WirelessConfigurationData *ssidData = nullptr;
 	
@@ -219,10 +220,15 @@ pre(currentState == NetworkState::idle)
 		currentBssidPtr = nullptr;
 #if ESP32
 	// On ESP32 we need to jump through a few hoops to get the hostname passed to the DHCP server
+	debugPrint("con1\n");
 	WiFi.setHostname(webHostName);
+	debugPrint("con2\n");
 	WiFi.mode(WIFI_STA);
-	WiFi.disconnect(true);
+	debugPrint("con3\n");
+	if (WiFiInitialised) WiFi.disconnect(true);
+	debugPrint("con4\n");
 	WiFi.config(IPAddress(apData.ip), IPAddress(apData.gateway), IPAddress(apData.netmask));
+	debugPrint("con5\n");
 
 	WiFi.setHostname(webHostName);
 #else
@@ -230,6 +236,7 @@ pre(currentState == NetworkState::idle)
 	wifi_station_set_hostname(webHostName);     				// must do this before calling WiFi.begin()
 	WiFi.config(IPAddress(apData.ip), IPAddress(apData.gateway), IPAddress(apData.netmask), IPAddress(), IPAddress());
 #endif
+	WiFiInitialised = true;
 	WiFi.setAutoConnect(false);
 //	WiFi.setAutoReconnect(false);								// auto reconnect NEVER works in our configuration so disable it, it just wastes time
 	WiFi.setAutoReconnect(true);
@@ -584,14 +591,18 @@ pre(currentState == WiFiState::idle)
 			lastError = "no data found for requested SSID";
 			return;
 		}
+		debugPrint("Connecting directly to requested SSID\n");
+		ConnectToAccessPoint(*ssidData, nullptr, false);
+		return;
 	}
 	// Auto scan for strongest known network, then try to connect to it
 #if ESP32
-	const int8_t num_ssids = WiFi.scanNetworks(false, true, false, 750);
+	const int16_t num_ssids = WiFi.scanNetworks(false, true, false, 750);
 #else
-	const int8_t num_ssids = WiFi.scanNetworks(false, true, 0, ssidPtr, 500, 750);
+	const int16_t num_ssids = WiFi.scanNetworks(false, true, 0, ssidPtr, 500, 750);
 #endif
 	debugPrintf("Scan found %d SSIDs\n", num_ssids);
+	WiFiInitialised = true;
 	if (num_ssids < 0)
 	{
 		lastError = "network scan failed";
@@ -601,8 +612,8 @@ pre(currentState == WiFiState::idle)
 	}
 
 	// Find the strongest network that we know about
-	int8_t strongestNetwork = -1;
-	for (int8_t i = 0; i < num_ssids; ++i)
+	int16_t strongestNetwork = -1;
+	for (int16_t i = 0; i < num_ssids; ++i)
 	{
 		debugPrintfAlways("found network %s BSSID %s RSSI %d\n", WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.RSSI(i));
 		if (strongestNetwork < 0 || WiFi.RSSI(i) > WiFi.RSSI(strongestNetwork))
@@ -775,6 +786,31 @@ static union
 } messageHeaderOut;
 
 #if ESP32
+static uint32_t GetResetReason()
+{
+	// Return the reason for the last hardware reset. Note that RRF expects the reason values to
+	// be an extended version of those used by esp8266 devices, so we translate the esp32 values
+	static const uint8_t ESP32RestToRRF[] = {
+		9, // ESP_RST_UNKNOWN
+		6, // ESP_RST_POWERON
+		9, // ESP_RST_EXT
+		4, // ESP_RST_SW
+		2, // ESP_RST_SW
+		1, // ESP_RST_INT_WDT
+		3, // ESP_RST_TASK_WDT
+		1, // ESP_RST_WDT
+		5, // ESP_RST_DEEPSLEEP
+		7, // ESP_RST_BROWNOUT
+		8, // ESP_RST_SDIO
+	};
+	const esp_reset_reason_t resetInfo = esp_reset_reason();
+	debugPrintf("ESP32 reset reason %d\n", resetInfo);
+	if (resetInfo >= sizeof(ESP32RestToRRF))
+		return (uint32_t) ESP32RestToRRF[ESP_RST_UNKNOWN];
+	else
+		return (uint32_t) ESP32RestToRRF[resetInfo];
+}
+
 void RebuildServices()
 {
 	ESP_ERROR_CHECK(mdns_service_remove_all());
@@ -997,8 +1033,8 @@ void ICACHE_RAM_ATTR ProcessRequest()
 				//response->freeHeap = system_get_free_heap_size();
 #if ESP32
 				response->freeHeap = esp_get_free_heap_size();
-				response->resetReason = 0;
-				response->flashSize = 0;
+				response->resetReason = GetResetReason();
+				response->flashSize = spi_flash_get_chip_size();
 				response->rssi = WiFi.RSSI();
 				response->numClients = (runningAsAp) ? 10 : 0;
 				response->sleepMode = (uint8_t)1;
