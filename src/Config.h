@@ -10,7 +10,7 @@
 #endif
 #define NO_WIFI_SLEEP	0
 
-#define VERSION_MAIN	"1.27-03a"
+#define VERSION_MAIN	"1.27-04"
 
 #ifdef LPCRRF
 #ifdef EXTENDED_LISTEN
@@ -63,6 +63,9 @@ const uint32_t defaultClockControl = spi20MHzDMA;
 // 0x2402	26.7MHz 1:2
 // 0x2002	26.7MHz 2:1
 // 0x3043	20MHz 2:2
+// 0x4044	16MHz 3:2
+// 0x4084	16MHz 2:3 (not tested)
+
 // Define the SPI clock frequency
 #ifdef LPCRRF
 //SD:: LPC as a slave can only up to 1/12th PCLK. 7M was getting some errors, 6M seems stable.

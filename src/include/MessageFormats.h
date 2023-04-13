@@ -85,7 +85,8 @@ enum class NetworkCommand : uint8_t
 #if 1
 	// Extra definitions for compatibility with RTOS version of WiFiSocketServer
 	networkStartScan,			// start a scan for APs the module can connect to
-	networkGetScanResult		// get the results of the previously started scan
+	networkGetScanResult,		// get the results of the previously started scan
+	networkAddEnterpriseSsid,	// add an enterprise ssid and its credentials
 #endif
 };
 
@@ -110,14 +111,14 @@ const size_t headerDwords = NumDwords(sizeof(MessageHeaderSamToEsp));
 #if 1
 
 // Extra definitions for compatibility with RTOS version of WiFiSocketServer
-enum class EspWiFiPhyMode
+enum class EspWiFiPhyMode : uint8_t
 {
 	B = 1,
 	G = 2,
 	N = 3,
 };
 
-enum class WiFiAuth
+enum class WiFiAuth : uint8_t
 {
 	OPEN = 0,
 	WEP,
@@ -133,9 +134,14 @@ enum class WiFiAuth
 
 struct WiFiScanData
 {
-	int8_t rssi;	/* signal strength from -100 to 0 in dB */
+	int8_t rssi;					// signal strength from -100 to 0 in dB
 	EspWiFiPhyMode phymode;
 	WiFiAuth auth;
+#if 1	// added at version 2.1beta4
+	uint8_t primaryChannel;
+	uint8_t mac[6];
+	uint8_t spare[2];			// spare fore future use
+#endif
 	char ssid[SsidLength + 1];
 };
 
@@ -223,6 +229,17 @@ struct NetworkStatusResponse
 	char ssid[SsidLength];			// SSID of the router we are connected to, or our own SSID, null terminated
 	char hostName[64];				// name of the access point we are connected to, or our own access point name, null terminated
 	uint32_t clockReg;				// the SPI clock register
+
+	// Added at version 2.1
+	uint32_t netmask;				// subnet mask of the network connected to/created
+	uint32_t gateway;				// endorsed gateway IP of the network connected to/created
+	uint32_t numReconnects;			// number of reconnections since the explicit STA connection by RRF
+	uint8_t  usingDhcpc;			// if the current ip, netmask, gateway was obtained through DHCP as a client
+	WiFiAuth auth;					// authentication method of the AP connected to in STA mode, in AP mode always WPA2-Personal
+	uint8_t channel : 4,			// primary channel used by the STA/AP connection
+			ht:	2,					// HT20, HT40 above, HT40 below
+			zero3: 2;				// unused, set to zero
+	uint8_t zero4;					// unused, set to zero
 };
 
 /* The reset reasons are coded as follows (see resetReasonTexts in file WiFiInterface.cpp in the RepRapFirmware project):
@@ -284,12 +301,14 @@ const int32_t ResponseBusy = -8;
 const int32_t ResponseBufferTooSmall = -9;
 const int32_t ResponseBadReplyFormatVersion = -10;
 const int32_t ResponseBadParameter = -11;
-const int32_t ResponseUnknownError = -12;
 
 #if 1
 // Extra definitions for compatibility with RTOS version of WiFiSocketServer
-const int32_t ResponseNoScanStarted = -13;
-const int32_t ResponseScanInProgress = -14;
+const int32_t ResponseNoScanStarted = -12;
+const int32_t ResponseScanInProgress = -13;
+const int32_t ResponseUnknownError = -14;
+#else
+const int32_t ResponseUnknownError = -12;		// this was correct for WiFiServer 1.27 and earlier, however it is never returned by those versions of WiFi firmware
 #endif
 
 const size_t MaxRememberedNetworks = 20;
