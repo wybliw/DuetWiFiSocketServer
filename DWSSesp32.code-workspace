@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "..\\..\\..\\esp\\esp-idf"
+		},
+		{
+			"path": "../../../esp-safe/esp/esp-idf"
 		}
 	],
 	"settings": {
